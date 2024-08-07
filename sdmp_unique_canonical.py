@@ -8,7 +8,9 @@ It does so in parallel for all the molecules in the QM9 dataset.
 
 # Start up
 # -------
+import argparse
 import sys
+import logging
 from mpi4py import MPI
 
 import numpy as np
@@ -27,6 +29,13 @@ from CategoricalPointCloud import CatFrame as Frame
 
 # Setup
 # -----
+parser = argparse.ArgumentParser()
+parser.add_argument('--n_data', type=int, default=100, help='Random seed')
+parser.add_argument('--frq_log', type=int, default=10, help='Random seed')
+args = parser.parse_args()
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+
 qm9 = QM9(root='./data/qm9-2.4.0/')
 frame = Frame()
 
@@ -56,8 +65,8 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-n_data = len(qm9[:10])
-n_g_actions = 20
+n_data = len(qm9[:args.n_data])
+n_g_actions = 5
 chunk_size = n_data // size
 start_idx = rank * chunk_size
 end_idx = (rank + 1) * chunk_size if rank != size - 1 else n_data
@@ -73,6 +82,10 @@ np.random.seed(seed + rank)
 # Main Loop
 # ---------
 for idx,data in enumerate(qm9[start_idx:end_idx]):
+
+    if rank==0 and (idx+1) % args.frq_log == 0:  
+        logging.info(f"Process {rank}: Completed {idx+1}/{chunk_size} iterations.")
+
     pc_data = data.pos
     cat_data = data.z.numpy()
 
