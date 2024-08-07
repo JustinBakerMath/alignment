@@ -23,8 +23,7 @@ from torch_geometric.loader import DataLoader
 
 from pointgroup import PointGroup
 
-sys.path.append('./pyorbit/')
-from CategoricalPointCloud import CatFrame as Frame
+from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
 
 
 # Setup

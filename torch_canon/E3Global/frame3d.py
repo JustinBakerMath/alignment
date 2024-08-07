@@ -4,10 +4,12 @@ import ast
 import torch
 import numpy as np
 
-from Alignment import *
-from Geometry import angle_between_vectors, planar_normal, project_onto_plane
-from Hopcroft import PartitionRefinement
-from Qhull import Qhull
+from torch_canon.utilities import *
+from torch_canon.Hopcroft import PartitionRefinement
+
+from torch_canon.E3Global.align3D import *
+from torch_canon.E3Global.encode3D import enc_us_pc, enc_ch_pc
+from torch_canon.E3Global.qhull import Qhull
 
 class Frame(metaclass=ABCMeta):
     def __init__(self, tol=1e-2, *args, **kwargs):
@@ -15,30 +17,15 @@ class Frame(metaclass=ABCMeta):
         self.tol = tol
         self.chull = Qhull()
 
-    def project_sphere(self, data, *args, **kwargs):
-        distances = np.linalg.norm(data, axis=1, keepdims=False)
-        temp =  data/np.linalg.norm(data, axis=1, keepdims=True)
-        arr, key = np.unique(temp, axis=0, return_inverse=True)
-        encoding = {}
-        dists_hash = {}
-        for val in set(key):
-            dists = [custom_round(v,self.tol) for v in distances[key==val]]
-            dists = tuple(sorted(dists))
-            if dists not in dists_hash:
-                dists_hash[dists] = id(dists)
-
-            encoding[val] = dists_hash[dists]
-        return dists_hash, encoding, arr
-
 
     def get_frame(self, data, *args, **kwargs):
 
-        data = self.check_type(data) # Assert Type
+        data = check_type(data) # Assert Type
         data = self.align_center(data) # Assert Centered
         data = data[np.linalg.norm(data, axis=1) > self.tol]
 
         # PROJECT ONTO SPHERE
-        dist_hash, r_encoding, shell_data = self.project_sphere(data, *args, **kwargs)
+        dist_hash, r_encoding, shell_data = use_pc(data, *args, **kwargs)
 
         # GET CONVEX HULL
         shell_rank = np.linalg.matrix_rank(shell_data, tol=self.tol)
@@ -51,7 +38,7 @@ class Frame(metaclass=ABCMeta):
             false_values = [i for i, x in enumerate(bool_lst) if not x]
             shell_data = np.delete(shell_data, false_values, axis=0)
             # PROJECT ONTO SPHERE
-            dist_hash, r_encoding, shell_data = self.project_sphere(shell_data, *args, **kwargs)
+            dist_hash, r_encoding, shell_data = use_pc(shell_data, *args, **kwargs)
 
             # GET CONVEX HULL
             shell_rank = np.linalg.matrix_rank(shell_data, tol=self.tol)
@@ -64,7 +51,7 @@ class Frame(metaclass=ABCMeta):
         # GET GEOMETRIC ENCODING
         adj_list = build_adjacency_list(shell_graph)
         dg = direct_graph(shell_graph)
-        g_hash, g_encoding = self.geometric_encoding(shell_data, adj_list, shell_rank)
+        g_hash, g_encoding = che_pc(shell_data, adj_list, shell_rank)
 
         # COMBINE ENCODINGS
         n_encoding = {}
@@ -185,34 +172,6 @@ class Frame(metaclass=ABCMeta):
     def align_center(self, pointcloud):
         return pointcloud - np.mean(pointcloud,axis=0)
 
-
-    def geometric_encoding(self, shell_data, adj_list, shell_rank):
-        # Project edges onto relative plane
-        encoding = {}
-        g_hash = {}
-        for point in adj_list.keys():
-            r_ij = shell_data[adj_list[point]]-shell_data[point]
-            if shell_rank == 1:
-                d_ij = np.zeros_like(np.linalg.norm(r_ij, axis=1))
-            else:
-                d_ij = np.linalg.norm(r_ij, axis=1)
-            projection = project_onto_plane(r_ij, shell_data[point])
-            angle = []
-            for i in range(len(projection)):
-                if shell_rank == 3:
-                    angle += [angle_between_vectors(projection[i], projection[i-1])]
-                else:
-                    angle += [0]
-
-            # lexicographical shift
-            lst = [(custom_round(a,self.tol),custom_round(d,self.tol)) for a,d in zip(angle, d_ij)]
-            lst = tuple(list_rotate(lst))
-            if lst not in g_hash:
-                g_hash[lst] = id(lst)
-            encoding[point] = g_hash[lst]
-        return g_hash, encoding
-
-
     def check_type(self, data, *args, **kwargs):
         if isinstance(data, torch.Tensor):
             return data.detach().cpu().numpy()
@@ -251,3 +210,4 @@ if __name__ == "__main__":
         print('Regular Polyhedron of {k} sides')
         theta = 2*np.pi/k
     pass
+
