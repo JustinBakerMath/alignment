@@ -10,7 +10,7 @@ Includes:
 import torch
 
 from torch_canon.utilities import custom_round, list_rotate
-from torch_canon.E3Global.align3D import cartesian_to_xspherical, project_onto_plane, angle_between_vectors
+from torch_canon.E3Global.align3D import cartesian2spherical_xtheta, project_onto_plane, angle_between_vectors
 
 # Unit Sphere (US)
 #----------------------------
@@ -87,7 +87,7 @@ def enc_ch_pc(us_data, adj_list, shell_rank, tol=1e-16):
 def reduce_us(us_data, tol=1e-16):
     similar_indices = []
     uq_indices = []
-    sph_data = torch.tensor([cartesian_to_xspherical(*v) for v in us_data], dtype=torch.float32)
+    sph_data = torch.tensor([cartesian2spherical_xtheta(*v) for v in us_data], dtype=torch.float32)
     for i in range(sph_data.shape[0]):
         similar_indices.append([i])
         uq_indices.append(i)

@@ -66,7 +66,6 @@ np.random.seed(42)
 for idx,data in enumerate(qm9[:args.n_data]):
     # generate smiles using atomic_number_to_symbol and data.z
     smiles = ''.join([atomic_number_to_symbol[z] for z in data.z.numpy()])
-    print(smiles)
 
 
     logging.info(f"Process Completed {idx+1}/{args.n_data} iterations.")
@@ -88,8 +87,6 @@ for idx,data in enumerate(qm9[:args.n_data]):
         
     for i in range(args.n_transform):
         loss = compute_loss(i, pc_data, normalized_data, cat_data)
-        print(loss)
-        print('='*10)
 
         if data_rank == 1:
             data_rank1_loss += loss

@@ -1,5 +1,5 @@
 '''
-
+                         --variable shorthand--
 Notation:
     ch: Convex Hull
     us: Unit Sphere
