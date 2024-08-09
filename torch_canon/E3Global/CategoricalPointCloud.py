@@ -21,11 +21,6 @@ from torch_canon.E3Global.dfa3D import construct_dfa, convert_partition
 from torch_canon.E3Global.encode3D import enc_us_catpc, enc_ch_pc
 from torch_canon.E3Global.qhull import get_ch_graph
 
-class Molecule:
-    def __init__(self, data=None, cat_data=None):
-        self.pos = data
-        self.z = cat_data
-
 class CatFrame(metaclass=ABCMeta):
     def __init__(self, tol=1e-2, *args, **kwargs):
         super().__init__()
@@ -54,7 +49,7 @@ class CatFrame(metaclass=ABCMeta):
         bool_lst = [i in ch_graph for i in range(us_n)]
         assert all(bool_lst), 'Convex Hull is not correct'
 
-        # GET GEOMETRIC ENCODING
+        # Encode Convex Hull Geometry
         adj_list = build_adjacency_list(ch_graph)
         dg = direct_graph(ch_graph)
         g_hash, g_encoding = enc_ch_pc(us_data, adj_list, us_rank)

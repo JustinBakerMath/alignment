@@ -21,12 +21,12 @@ def enc_us_pc(data, tol=1e-16, **kwargs):
     # Project and reduce locally close points (n^2 complexity)
     distances = data.norm(dim=1, keepdim=True)
     proj_data =  data/distances
-    locally_close_idx_arrs, uq_indx = reduce_us(proj_data, tol=tol)
+    close_proj_point_idxs, uq_indx = reduce_us(proj_data, tol=tol)
 
-    # Encode information while pooling locally close points
-    for i,idx_arr in enumerate(locally_close_idx_arrs):
-        dists = [custom_round(distances[idx],tol) for idx in idx_arr]
-        dists = tuple(sorted(dists))
+    # Encode distances
+    for i,point_idx in enumerate(close_proj_point_idxs):
+        dists = [custom_round(distances[idx],tol) for idx in point_idx]
+        dists = tuple(sorted(dists)) # sort distances
         if dists not in dists_hash:
             dists_hash[dists] = id(dists) # Hash data
         encoding[i] = dists_hash[dists]
@@ -56,22 +56,25 @@ def enc_us_catpc(data, cat_data, tol=1e-16, **kwargs):
 
 # Convex Hull (CH)
 #----------------------------
-
-def enc_ch_pc(us_data, adj_list, shell_rank, tol=1e-16):
+def enc_ch_pc(us_data, adj_list, us_rank, tol=1e-16):
     encoding = {}
     g_hash = {}
 
-    # Project edges onto relative plane
+    # Encode edge information
     for point in adj_list.keys():
         r_ij = us_data[adj_list[point]]-us_data[point]
-        if shell_rank == 1:
+
+        # distance encoding
+        if us_rank == 1: # 
             d_ij = torch.zeros_like(torch.linalg.norm(r_ij, axis=1))
         else:
             d_ij = torch.linalg.norm(r_ij, axis=1)
+
+        # angle encoding
         projection = project_onto_plane(r_ij, us_data[point])
         angle = []
         for i in range(len(projection)):
-            if shell_rank == 3:
+            if us_rank == 3:
                 angle += [angle_between_vectors(projection[i], projection[i-1])]
             else:
                 angle += [0]
