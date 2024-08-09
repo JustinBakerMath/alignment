@@ -15,19 +15,23 @@ from torch_canon.E3Global.align3D import cartesian2spherical_xtheta, project_ont
 # Unit Sphere (US)
 #----------------------------
 def enc_us_pc(data, tol=1e-16, **kwargs):
-    distances = data.norm(1, keepdim=False)
-    temp =  data/(data.norm(1, keepdim=True)+1e-16)
-    arr, key = torch.unique(temp, sorted=False, return_inverse=True, dim=0)
     encoding = {}
     dists_hash = {}
-    for val in set(key):
-        dists = [custom_round(v,tol) for v in distances[key==val]]
+
+    # Project and reduce locally close points (n^2 complexity)
+    distances = data.norm(dim=1, keepdim=True)
+    proj_data =  data/distances
+    locally_close_idx_arrs, uq_indx = reduce_us(proj_data, tol=tol)
+
+    # Encode information while pooling locally close points
+    for i,idx_arr in enumerate(locally_close_idx_arrs):
+        dists = [custom_round(distances[idx],tol) for idx in idx_arr]
         dists = tuple(sorted(dists))
         if dists not in dists_hash:
-            dists_hash[dists] = id(dists)
+            dists_hash[dists] = id(dists) # Hash data
+        encoding[i] = dists_hash[dists]
 
-        encoding[val] = dists_hash[dists]
-    return dists_hash, encoding, arr
+    return dists_hash, encoding, proj_data[uq_indx]
 
 def enc_us_catpc(data, cat_data, tol=1e-16, **kwargs):
     encoding = {}
@@ -88,14 +92,19 @@ def reduce_us(us_data, tol=1e-16):
     similar_indices = []
     uq_indices = []
     sph_data = torch.tensor([cartesian2spherical_xtheta(*v) for v in us_data], dtype=torch.float32)
-    for i in range(sph_data.shape[0]):
+    I = [i for i in range(sph_data.shape[0])]
+    while(I):
+        i = I[0]
         similar_indices.append([i])
         uq_indices.append(i)
-        J = [j for j in range(i+1, sph_data.shape[0])]
-        for j in J:
+        J = [j for j in I[1:]]
+        while(J):
+            j=J[0]
             close_theta = torch.isclose(sph_data[i][1], sph_data[j][1], atol=tol, rtol=tol)
             close_gamma = torch.isclose(sph_data[i][2], sph_data[j][2], atol=tol, rtol=tol)
             if close_theta and close_gamma:
                 similar_indices[i].append(j)
-                J.remove(j)
+                I.remove(j)
+            J.remove(j)
+        I.remove(i)
     return similar_indices, uq_indices
