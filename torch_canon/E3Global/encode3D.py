@@ -44,7 +44,7 @@ def enc_us_catpc(data, cat_data, tol=1e-16, **kwargs):
 
     # Encode information while pooling locally close points
     for i,idx_arr in enumerate(locally_close_idx_arrs):
-        dists = [(custom_round(distances[idx],tol), custom_round(cat_data[idx],tol))  for idx in idx_arr] # Collect local info
+        dists = [(custom_round(distances[idx].item(),tol), custom_round(cat_data[idx],tol))  for idx in idx_arr] # Collect local info
         dists = tuple(sorted(dists)) # Sort data
         if dists not in dists_hash:
             dists_hash[dists] = id(dists) # Hash data
@@ -106,7 +106,7 @@ def reduce_us(us_data, tol=1e-16):
             close_theta = torch.isclose(sph_data[i][1], sph_data[j][1], atol=tol, rtol=tol)
             close_gamma = torch.isclose(sph_data[i][2], sph_data[j][2], atol=tol, rtol=tol)
             if close_theta and close_gamma:
-                similar_indices[i].append(j)
+                similar_indices[-1].append(j)
                 I.remove(j)
             J.remove(j)
         I.remove(i)

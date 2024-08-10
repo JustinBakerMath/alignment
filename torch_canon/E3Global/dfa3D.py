@@ -19,6 +19,7 @@ def convert_partition(hopcroft, dist_hash, g_hash, r_encoding, g_encoding):
         r1 = get_key(dist_hash, b[0])
         g1 = get_key(g_hash, b[1])
         ret_edges.append([(r0,g0),(r1,g1)])
+
         r0 = get_key(r_encoding, a[0])
         r1 = get_key(r_encoding, b[0])
         ret_graph.append([r0,r1])

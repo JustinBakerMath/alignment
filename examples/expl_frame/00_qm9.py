@@ -12,7 +12,6 @@ import argparse
 import sys
 import logging
 
-from mpi4py import MPI
 from time import time
 
 import numpy as np
@@ -59,48 +58,25 @@ def compute_loss(i, pc_data, normalized_data, cat_data):
     return loss
 
 
-# MPI Setup
-# ---------
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
-
-n_data = len(qm9[:args.n_data])
-n_g_actions = 5
-chunk_size = n_data // size
-start_idx = rank * chunk_size
-end_idx = (rank + 1) * chunk_size if rank != size - 1 else n_data
-
-if rank == 0:
-    seed = 42
-else:
-    seed = None
-seed = comm.bcast(seed, root=0)
-np.random.seed(seed + rank)
+np.random.seed(42)
 
 
 # Main Loop
 # ---------
-for idx,data in enumerate(qm9[start_idx:end_idx]):
+for idx,data in enumerate(qm9[:args.n_data]):
 
-    if rank==0 and (idx+1) % args.frq_log == 0:  
-        logging.info(f"Process {rank}: Completed {idx+1}/{chunk_size} iterations.")
+    logging.info(f"Completed {idx+1}/{args.n_data} iterations.")
 
     pc_data = data.pos
     cat_data = data.z.numpy()
+    smiles = ''.join([atomic_number_to_symbol[cat] for cat in cat_data])
+    print(smiles)
 
     data_rank = torch.linalg.matrix_rank(pc_data)
     normalized_data, rot = frame.get_frame(pc_data, cat_data)
 
     loss += compute_loss(idx, pc_data, normalized_data, cat_data)
 
-loss_total = comm.reduce(loss, op=MPI.SUM, root=0)
-
-# MPI Finalize
-comm.Barrier()
-MPI.Finalize()
-
-if rank == 0:
-    logging.info(f'Average move {loss_total/n_data:.4f}')
-    logging.info(f'Time: {time()-start_time:.4f}')
-    logging.info('Done!')
+logging.info(f'Average move {loss/args.n_data:.4f}')
+logging.info(f'Time: {time()-start_time:.4f}')
+logging.info('Done!')
