@@ -142,7 +142,7 @@ if rank == 0:
                 tasks_sent += 1
 
             #print(f"Task index: {task_index}")
-            pbar.update(task_index)
+            pbar.update(task_index - pbar.n)
 
         # Send stop signal to workers
         for i in range(1, size):
