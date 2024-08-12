@@ -112,10 +112,11 @@ if rank == 0:
             task_index += batch_size
             tasks_sent += 1
 
-        #print(f"Task index: {task_index}")
+        print(f"Task index: {task_index}")
 
     # Receive results and send new tasks dynamically
-    while tasks_sent > 0:
+    #while tasks_sent > 0:
+    while task_index < n_data:
         result_dict = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG)
         tasks_sent -= 1
 
@@ -140,6 +141,7 @@ if rank == 0:
             task_index += batch_size
             tasks_sent += 1
 
+        print(f"Task index: {task_index}")
 
     # Send stop signal to workers
     for i in range(1, size):
