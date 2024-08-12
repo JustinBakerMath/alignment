@@ -12,6 +12,7 @@ import argparse
 import random
 import logging
 import sys
+from tqdm import tqdm
 
 from mpi4py import MPI
 
@@ -114,36 +115,38 @@ if rank == 0:
 
         #print(f"Task index: {task_index}")
 
-    # Receive results and send new tasks dynamically
-    while tasks_sent > 0:
-        result_dict = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG)
-        tasks_sent -= 1
+    with tqdm(total=n_data) as pbar:
+        # Receive results and send new tasks dynamically
+        while tasks_sent > 0:
+            result_dict = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG)
+            tasks_sent -= 1
 
-        rank1_loss_total += result_dict['rank1_loss']
-        rank1_count_total += result_dict['rank1_count']
-        rank2_loss_total += result_dict['rank2_loss']
-        rank2_count_total += result_dict['rank2_count']
-        rank3_loss_total += result_dict['rank3_loss']
-        rank3_count_total += result_dict['rank3_count']
-        pg_loss_total += np.array(result_dict['pg_losses'])
-        pg_count_total += np.array(result_dict['pg_counts'])
+            rank1_loss_total += result_dict['rank1_loss']
+            rank1_count_total += result_dict['rank1_count']
+            rank2_loss_total += result_dict['rank2_loss']
+            rank2_count_total += result_dict['rank2_count']
+            rank3_loss_total += result_dict['rank3_loss']
+            rank3_count_total += result_dict['rank3_count']
+            pg_loss_total += np.array(result_dict['pg_losses'])
+            pg_count_total += np.array(result_dict['pg_counts'])
 
-        #print(f"Main received result from {result_dict['worker']}")
-        #print(f"Tasks sent: {tasks_sent}")
-        #print(f"Task index: {task_index}")
+            #print(f"Main received result from {result_dict['worker']}")
+            #print(f"Tasks sent: {tasks_sent}")
+            #print(f"Task index: {task_index}")
 
-        if task_index < n_data:
-            batch_end = min(task_index + batch_size, n_data)
-            #print(f"Main sending task to worker {result_dict['worker']}")
-            comm.send(qm9[task_index:batch_end], dest=result_dict['worker'], tag=1)
-            task_index += batch_size
-            tasks_sent += 1
+            if task_index < n_data:
+                batch_end = min(task_index + batch_size, n_data)
+                #print(f"Main sending task to worker {result_dict['worker']}")
+                comm.send(qm9[task_index:batch_end], dest=result_dict['worker'], tag=1)
+                task_index += batch_size
+                tasks_sent += 1
 
-        #print(f"Task index: {task_index}")
+            #print(f"Task index: {task_index}")
+            pbar.update(task_index)
 
-    # Send stop signal to workers
-    for i in range(1, size):
-        comm.send(None, dest=i, tag=0)
+        # Send stop signal to workers
+        for i in range(1, size):
+            comm.send(None, dest=i, tag=0)
 
 else:
     # WORKER LOOP
