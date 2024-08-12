@@ -1,3 +1,4 @@
 **/data/**
+**/out/**
 **/__pycache__/**
 **/torch_canon.egg-info/**

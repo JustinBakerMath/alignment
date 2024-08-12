@@ -9,8 +9,10 @@ It does so in parallel for all the molecules in the QM9 dataset.
 # Start up
 # -------
 import argparse
-import sys
+import random
 import logging
+import sys
+
 from mpi4py import MPI
 
 import numpy as np
@@ -50,6 +52,16 @@ data_rank1_loss, data_rank1_count = 0,0
 data_rank2_loss, data_rank2_count = 0,0
 data_rank3_loss, data_rank3_count = 0,0
 
+pg_loss_total = np.array([0 for _ in pg_map])
+pg_count_total = np.array([0 for _ in pg_map])
+rank1_loss_total = 0
+rank1_count_total = 0
+rank2_loss_total = 0
+rank2_count_total = 0
+rank3_loss_total = 0
+rank3_count_total = 0
+
+
 # Helper Functions
 # ----------------
 def addCounter(counter1, counter2, datatype):
@@ -80,6 +92,7 @@ size = comm.Get_size()
 n_data = len(qm9[:args.n_data])
 chunk_size = n_data // size
 start_idx = rank * chunk_size
+data_indices = [i for i in range(n_data)]
 end_idx = (rank + 1) * chunk_size if rank != size - 1 else n_data
 
 if rank == 0:
@@ -87,7 +100,11 @@ if rank == 0:
 else:
     seed = None
 seed = comm.bcast(seed, root=0)
+random.seed(seed + rank)
 np.random.seed(seed + rank)
+torch.manual_seed(seed + rank)
+random.shuffle(data_indices)
+data_indices = comm.bcast(data_indices, root=0)
 
 
 # Main Loop
