@@ -105,22 +105,20 @@ if rank == 0:
 
     # Distribute initial tasks
     for i in range(1, size):
-        print(f"Main sending task to worker {i}")
+        #print(f"Main sending task to worker {i}")
         if task_index < n_data:
             batch_end = min(task_index + batch_size, n_data)
             comm.send(qm9[task_index:batch_end], dest=i, tag=1)
             task_index += batch_size
             tasks_sent += 1
 
-        print(f"Task index: {task_index}")
+        #print(f"Task index: {task_index}")
 
     # Receive results and send new tasks dynamically
-    #while tasks_sent > 0:
-    while task_index < n_data:
+    while tasks_sent > 0:
         result_dict = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG)
         tasks_sent -= 1
 
-        
         rank1_loss_total += result_dict['rank1_loss']
         rank1_count_total += result_dict['rank1_count']
         rank2_loss_total += result_dict['rank2_loss']
@@ -130,18 +128,18 @@ if rank == 0:
         pg_loss_total += np.array(result_dict['pg_losses'])
         pg_count_total += np.array(result_dict['pg_counts'])
 
-        print(f"Main received result from {result_dict['worker']}")
+        #print(f"Main received result from {result_dict['worker']}")
         #print(f"Tasks sent: {tasks_sent}")
         #print(f"Task index: {task_index}")
 
         if task_index < n_data:
             batch_end = min(task_index + batch_size, n_data)
-            print(f"Main sending task to worker {result_dict['worker']}")
+            #print(f"Main sending task to worker {result_dict['worker']}")
             comm.send(qm9[task_index:batch_end], dest=result_dict['worker'], tag=1)
             task_index += batch_size
             tasks_sent += 1
 
-        print(f"Task index: {task_index}")
+        #print(f"Task index: {task_index}")
 
     # Send stop signal to workers
     for i in range(1, size):
@@ -161,6 +159,8 @@ else:
 
             pc_data = data.pos
             cat_data = data.z.numpy()
+            #smiles = ''.join([atomic_number_to_symbol[z] for z in cat_data])
+            #print(f"Worker {rank} - {idx}: {smiles}")
 
             data_rank = torch.linalg.matrix_rank(pc_data)
             normalized_data, rot = frame.get_frame(pc_data, cat_data)
@@ -188,7 +188,7 @@ else:
                 pg_losses[pg_map[pg]] += loss
                 pg_counts[pg_map[pg]] += 1
             
-            comm.send({'rank1_loss': rank1_loss, 'rank1_count': rank1_count,
+        comm.send({'rank1_loss': rank1_loss, 'rank1_count': rank1_count,
                   'rank2_loss': rank2_loss, 'rank2_count': rank2_count,
                   'rank3_loss': rank3_loss, 'rank3_count': rank3_count,
                        'pg_losses': pg_losses, 'pg_counts': pg_counts, 'worker': rank}, dest=0, tag=1)
