@@ -29,8 +29,9 @@ from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
 # Setup
 # -----
 parser = argparse.ArgumentParser()
-parser.add_argument('--n_data', type=int, default=100, help='Random seed')
-parser.add_argument('--frq_log', type=int, default=10, help='Random seed')
+parser.add_argument('--n_data', type=int, default=100, help='Number of data.')
+parser.add_argument('--n_g_act', type=int, default=100, help='Number of data transformations by group action.')
+parser.add_argument('--frq_log', type=int, default=10, help='How often to log progress.')
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -38,16 +39,27 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 qm9 = QM9(root='./data/qm9-2.4.0/')
 frame = Frame()
 
-atomic_number_to_symbol = {
-    1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'
-    }
-pg_losses = {}
+atomic_number_to_symbol = {1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'}
+
+pg_map = ["C1","C1h","C1v","C2","C2h","C2v","C3","C3h","C3v","Cs","Cinfv","Ci","Dinfh","D2d","D2h","D3","D3d","D3h","D6h","Td","S2",]
+pg_map = {pg: idx for idx, pg in enumerate(pg_map)}
+
+pg_losses = [0 for _ in pg_map]
+pg_counts = [0 for _ in pg_map]
 data_rank1_loss, data_rank1_count = 0,0
 data_rank2_loss, data_rank2_count = 0,0
 data_rank3_loss, data_rank3_count = 0,0
 
 # Helper Functions
 # ----------------
+def addCounter(counter1, counter2, datatype):
+    for item in counter2:
+        if item not in counter1:
+            counter1[item] = counter2[item]
+        else:
+            counter1[item] += counter2[item]
+    return counter1
+
 def compute_loss(i, pc_data, normalized_data, cat_data):
     random_rotation = R.random().as_matrix()
     random_translation = np.random.rand(3)
@@ -61,11 +73,11 @@ def compute_loss(i, pc_data, normalized_data, cat_data):
 # MPI Setup
 # ---------
 comm = MPI.COMM_WORLD
+#MPI.Init_thread(MPI.THREAD_MULTIPLE)
 rank = comm.Get_rank()
 size = comm.Get_size()
 
 n_data = len(qm9[:args.n_data])
-n_g_actions = 5
 chunk_size = n_data // size
 start_idx = rank * chunk_size
 end_idx = (rank + 1) * chunk_size if rank != size - 1 else n_data
@@ -92,67 +104,58 @@ for idx,data in enumerate(qm9[start_idx:end_idx]):
     normalized_data, rot = frame.get_frame(pc_data, cat_data)
     symbols = [atomic_number_to_symbol[z] for z in cat_data]
         
-    # Multi-Threading
-    #~~~~~~~~~~~~~~~~
-    # Split the group action loop across processes within the same rank
-    inner_size = min(n_g_actions, size)  # Maximum of 10 as we have 10 transformations
-    inner_comm = comm.Split(color=rank % inner_size, key=rank)
-
-    inner_rank = inner_comm.Get_rank()
-    inner_size = inner_comm.Get_size()
+    try:
+        pg = PointGroup(normalized_data, symbols).get_point_group()
+    except:
+        pg = 'C1'
 
     local_losses = []
-    for i in range(inner_rank, n_g_actions, inner_size):
+    for i in range( args.n_g_act):
         loss = compute_loss(i, pc_data, normalized_data, cat_data)
-        local_losses.append(loss)
 
-    all_losses = inner_comm.gather(local_losses, root=0)
+        if data_rank == 1:
+            data_rank1_loss += loss
+            data_rank1_count += 1
+        elif data_rank == 2:
+            data_rank2_loss += loss
+            data_rank2_count += 1
+        else:
+            data_rank3_loss += loss
+            data_rank3_count += 1
 
-    if inner_rank == 0:
-        all_losses_flat = [item for sublist in all_losses for item in sublist]
-        for loss in all_losses_flat:
-            if data_rank == 1:
-                data_rank1_loss += loss
-                data_rank1_count += 1
-            elif data_rank == 2:
-                data_rank2_loss += loss
-                data_rank2_count += 1
-            else:
-                data_rank3_loss += loss
-                data_rank3_count += 1
+        pg_losses[pg_map[pg]] += loss
+        pg_counts[pg_map[pg]] += 1
             
-    # Free the inner communicator
-    inner_comm.Free()
 
+pg_loss_total = comm.reduce(np.array(pg_losses), op=MPI.SUM, root=0)
+pg_count_total = comm.reduce(np.array(pg_counts), op=MPI.SUM, root=0)
 rank1_loss_total = comm.reduce(data_rank1_loss, op=MPI.SUM, root=0)
 rank1_count_total = comm.reduce(data_rank1_count, op=MPI.SUM, root=0)
 rank2_loss_total = comm.reduce(data_rank2_loss, op=MPI.SUM, root=0)
 rank2_count_total = comm.reduce(data_rank2_count, op=MPI.SUM, root=0)
 rank3_loss_total = comm.reduce(data_rank3_loss, op=MPI.SUM, root=0)
 rank3_count_total = comm.reduce(data_rank3_count, op=MPI.SUM, root=0)
-#pg_losses_total = comm.reduce(pg_losses, op=MPI.SUM, root=0)
 
 # Results
 # -------
 if rank == 0:
-    print(f'Rank 1 Loss: {rank1_loss_total/(rank1_count_total+1e-16):.5f},',
-          f' Rank 2 Loss: {rank2_loss_total/(rank2_count_total+1e-16):.5f},',
-          f' Rank 3 Loss: {rank3_loss_total/(rank3_count_total+1e-16):.5f}')
-
-    print(f'Rank 1 Loss: {rank1_loss_total:.5f},',
-          f'Rank 2 Loss: {rank2_loss_total:.5f},',
-          f'Rank 3 Loss: {rank3_loss_total:.5f}')
 
     print(f'Rank 1 Count: {rank1_count_total},',
           f'Rank 2 Count: {rank2_count_total},',
           f'Rank 3 Count: {rank3_count_total}')
 
-    #for key, dct in pg_losses_total.items():
-        #val = dct['loss'] / dct['count']
-        #print(f'\tPoint Group {key} : {val}')
+    print(f'Rank 1 Loss: {rank1_loss_total/(rank1_count_total+1e-16):.5f},',
+          f' Rank 2 Loss: {rank2_loss_total/(rank2_count_total+1e-16):.5f},',
+          f' Rank 3 Loss: {rank3_loss_total/(rank3_count_total+1e-16):.5f}')
+
+    for idx, val in enumerate(pg_loss_total):
+        count = pg_count_total[idx]
+        pg = list(pg_map.keys())[idx]
+        if count == 0:
+            continue
+        print(f'Point Group {list(pg_map.keys())[idx]} : ({count}, {val/count:.5f})')
 
 # MPI Finalize
-comm.Barrier()
 MPI.Finalize()
 
 #print(f'Rank 1 Loss: {data_rank1_loss/(data_rank1_count+1e-16):.5f},',
