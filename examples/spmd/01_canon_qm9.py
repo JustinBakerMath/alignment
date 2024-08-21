@@ -45,7 +45,7 @@ frame = Frame()
 
 atomic_number_to_symbol = {1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'}
 
-pg_map = ["C1","C1h","C1v","C2","C2h","C2v","C3","C3h","C3v","Cs","Cinfv","Ci","Dinfh","D2d","D2h","D3","D3d","D3h","D6h","Td","S2",]
+pg_map = ["C1","C1h","C1v","C2","C2d","C2h","C2v","C3","C3h","C3v","C4","Cs","Cinfv","Ci","Dinfh","D2","D2d","D2h","D3","D3d","D3h","D6h","Oh","Td","S2","S4",]
 pg_map = {pg: idx for idx, pg in enumerate(pg_map)}
 
 pg_losses = [0 for _ in pg_map]
