@@ -1,4 +1,8 @@
+**/.ipynb_checkpoints/**
+
+**/__pycache__/**
+
+**/torch_canon.egg-info/**
+
 **/data/**
 **/out/**
-**/__pycache__/**
-**/torch_canon.egg-info/**
