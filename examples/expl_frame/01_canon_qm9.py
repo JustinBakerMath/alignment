@@ -29,14 +29,14 @@ from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
 # -----
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_data', type=int, default=1, help='Random seed')
-parser.add_argument('--n_transform', type=int, default=1, help='Random seed')
+parser.add_argument('--n_g_act', type=int, default=1, help='Random seed')
 parser.add_argument('--frq_log', type=int, default=10, help='Random seed')
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 qm9 = QM9(root='./data/qm9-2.4.0/')
-frame = Frame()
+frame = Frame(tol=1e-3)
 
 atomic_number_to_symbol = {
     1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'
@@ -68,7 +68,8 @@ for idx,data in enumerate(qm9[:args.n_data]):
     smiles = ''.join([atomic_number_to_symbol[z] for z in data.z.numpy()])
 
 
-    logging.info(f"Process Completed {idx+1}/{args.n_data} iterations.")
+    if idx % args.frq_log == 0:
+        logging.info(f"Process Completed {idx+1}/{args.n_data} iterations.")
 
     pc_data = data.pos
     cat_data = data.z.numpy()
@@ -85,8 +86,14 @@ for idx,data in enumerate(qm9[:args.n_data]):
     else:
         data_rank3_moved += moved
         
-    for i in range(args.n_transform):
+    for i in range(args.n_g_act):
         loss = compute_loss(i, pc_data, normalized_data, cat_data)
+        if loss > 1e-5:
+            try:
+                pg = PointGroup(normalized_data, symbols).get_point_group()
+            except:
+                pg = 'C1'
+            logging.info(f'{idx}: ({smiles}, {pg}) - {loss:.5f}')
 
         if data_rank == 1:
             data_rank1_loss += loss

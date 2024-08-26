@@ -22,7 +22,7 @@ from torch_canon.E3Global.encode3D import enc_us_catpc, enc_ch_pc
 from torch_canon.E3Global.qhull import get_ch_graph
 
 class CatFrame(metaclass=ABCMeta):
-    def __init__(self, tol=1e-4, *args, **kwargs):
+    def __init__(self, tol=1e-16, *args, **kwargs):
         super().__init__()
         self.tol = tol
 
