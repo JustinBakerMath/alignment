@@ -66,7 +66,8 @@ class CatFrame(metaclass=ABCMeta):
         self.hopcroft.refine(dfa)
         sorted_graph = convert_partition(self.hopcroft, dist_hash, g_hash, r_encoding, g_encoding)
         pth = self.traverse(sorted_graph, us_data, us_rank)
-        return align_pc_s3(cntr_data, us_data, pth)
+        data, frame_R = align_pc_s3(cntr_data, us_data, pth)
+        return data, frame_R, frame_t
 
     def traverse(self, sorted_graph, us_data, us_rank):
         edge = 0

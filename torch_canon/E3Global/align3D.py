@@ -20,19 +20,17 @@ def align_pc_t(pointcloud):
     ref_frame = pointcloud.mean(0) 
     return pointcloud - ref_frame, ref_frame
 
-def align_pc_s3(data, shell_data, pth):
+def align_pc_s3(data, us_data, pth):
         data = data.numpy()
-        shell_data = shell_data.numpy()
+        us_data = us_data.numpy()
         funcs = {0: z_axis_alignment, 1: zy_planar_alignment, 2: sign_alignment}
-        frame = np.eye(3)
+        frame = torch.eye(3).to(torch.float32)
         for idx,val in enumerate(pth):
-            data, rot = funcs[idx](data, shell_data[val])
-            shell_data, rot = funcs[idx](shell_data, shell_data[val])
-            if rot.__class__ == np.ndarray:
-                frame = frame @ rot
-            else:
-                frame = torch.tensor(frame)*rot
+            data, rot = funcs[idx](data, us_data[val])
+            us_data, rot = funcs[idx](us_data, us_data[val])
+            frame = rot @ frame
         return data, frame
+
 
 #def align_pc_s3(data, ref_frame):
     #funcs = {
@@ -119,8 +117,10 @@ def z_axis_alignment(positions, align_vec):
 def sign_alignment(positions, align_vec):
   " Align vector to positive x-direction"
   val = -1 if align_vec[0]<0 else 1
-  positions[:,1] = -positions[:,1]
-  return positions, val
+  positions[:,0] = val * positions[:,0]
+  R =  torch.eye(3).to(torch.float32)
+  R[0,0] = val
+  return positions, R
 
 
 # Vector Space Operations

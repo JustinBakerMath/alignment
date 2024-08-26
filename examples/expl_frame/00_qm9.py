@@ -45,16 +45,12 @@ atomic_number_to_symbol = {
     1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'
     }
 loss = 0
+recon_loss = 0
 
 # Helper Functions
 # ----------------
-def compute_loss(i, pc_data, normalized_data, cat_data):
-    random_rotation = R.random().as_matrix()
-    random_translation = np.random.rand(3)
-
-    g_pc_data = (random_rotation @ (pc_data + random_translation).numpy().T).T
-    g_normalized_data, rot = frame.get_frame(g_pc_data, cat_data)
-    loss = wasserstein_distance_nd(normalized_data, g_normalized_data)
+def compute_loss(data, data_transformed):
+    loss = wasserstein_distance_nd(data, data_transformed)
     return loss
 
 
@@ -69,14 +65,22 @@ for idx,data in enumerate(qm9[:args.n_data]):
 
     pc_data = data.pos
     cat_data = data.z.numpy()
+    normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
+
     smiles = ''.join([atomic_number_to_symbol[cat] for cat in cat_data])
-    print(smiles)
 
-    data_rank = torch.linalg.matrix_rank(pc_data)
-    normalized_data, rot = frame.get_frame(pc_data, cat_data)
+    loss += compute_loss(pc_data, normalized_data)
 
-    loss += compute_loss(idx, pc_data, normalized_data, cat_data)
+    #inv_R = torch.tensor(R.from_matrix(frame_R).inv().as_matrix(), dtype=torch.float32)
+    inv_R = torch.linalg.inv(frame_R)
+    recon_data = (inv_R @ normalized_data.T).T + frame_t
+    r_loss = compute_loss(pc_data, recon_data)
+    if r_loss > 1e-4:
+        logging.info(f'Loss {smiles}: {r_loss:.4f}')
+        break
+    recon_loss += r_loss
 
 logging.info(f'Average move {loss/args.n_data:.4f}')
+logging.info(f'Reconstruction loss {recon_loss/args.n_data:.4f}')
 logging.info(f'Time: {time()-start_time:.4f}')
 logging.info('Done!')
