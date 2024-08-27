@@ -11,6 +11,7 @@ import torch
 
 from torch_canon.utilities import custom_round, list_rotate
 from torch_canon.E3Global.align3D import cartesian2spherical_xtheta, project_onto_plane, angle_between_vectors
+from torch_canon.E3Global.geometry3D import check_colinear
 
 # Unit Sphere (US)
 #----------------------------
@@ -21,7 +22,7 @@ def enc_us_pc(data, tol=1e-16, **kwargs):
     # Project and reduce locally close points (n^2 complexity)
     distances = data.norm(dim=1, keepdim=True)
     proj_data =  data/distances
-    close_proj_point_idxs, uq_indx = reduce_us(proj_data, tol=tol)
+    close_proj_point_idxs, uq_indx = reduce_us(proj_data, data, tol=tol)
 
     # Encode distances
     for i,point_idx in enumerate(close_proj_point_idxs):
@@ -40,7 +41,7 @@ def enc_us_catpc(data, cat_data, tol=1e-16, **kwargs):
     # Project and reduce locally close points (n^2 complexity)
     distances = data.norm(dim=1, keepdim=True)
     proj_data =  data/distances
-    locally_close_idx_arrs, uq_indx = reduce_us(proj_data, tol=tol)
+    locally_close_idx_arrs, uq_indx = reduce_us(proj_data, data, tol=tol)
 
     # Encode information while pooling locally close points
     for i,idx_arr in enumerate(locally_close_idx_arrs):
@@ -91,11 +92,11 @@ def enc_ch_pc(us_data, adj_list, us_rank, tol=1e-16):
 
 # Reduction Tools
 #----------------
-def reduce_us(us_data, tol=1e-16):
+def reduce_us(us_data, data, tol=1e-16):
+    dists = us_data.norm(dim=1)
     similar_indices = []
     uq_indices = []
-    sph_data = torch.tensor([cartesian2spherical_xtheta(*v) for v in us_data], dtype=torch.float32)
-    I = [i for i in range(sph_data.shape[0])]
+    I = [i for i in range(us_data.shape[0])]
     while(I):
         i = I[0]
         similar_indices.append([i])
@@ -103,11 +104,12 @@ def reduce_us(us_data, tol=1e-16):
         J = [j for j in I[1:]]
         while(J):
             j=J[0]
-            close_theta = torch.isclose(sph_data[i][1], sph_data[j][1], atol=tol, rtol=tol)
-            close_gamma = torch.isclose(sph_data[i][2], sph_data[j][2], atol=tol, rtol=tol)
-            if close_theta and close_gamma:
-                similar_indices[-1].append(j)
-                I.remove(j)
+            is_close  = torch.allclose(us_data[i], us_data[j], atol=tol, rtol=tol)
+            if is_close:
+                colinear = check_colinear(data[i], data[j], tol)
+                if colinear:
+                    similar_indices[-1].append(j)
+                    I.remove(j)
             J.remove(j)
         I.remove(i)
     return similar_indices, uq_indices
