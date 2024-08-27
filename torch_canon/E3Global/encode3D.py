@@ -104,7 +104,7 @@ def reduce_us(us_data, data, tol=1e-16):
         J = [j for j in I[1:]]
         while(J):
             j=J[0]
-            is_close  = torch.allclose(us_data[i], us_data[j], atol=tol, rtol=tol)
+            is_close  = torch.allclose(us_data[i], us_data[j], atol=tol)
             if is_close:
                 colinear = check_colinear(data[i], data[j], tol)
                 if colinear:

@@ -20,30 +20,12 @@ from torch_canon.E3Global.align3D import align_pc_t, align_pc_s3
 from torch_canon.E3Global.dfa3D import construct_dfa, convert_partition
 from torch_canon.E3Global.encode3D import enc_us_catpc, enc_ch_pc
 from torch_canon.E3Global.geometry3D import check_colinear
+from torch_canon.E3Global.qhull import get_ch_graph
 
 from abc import ABCMeta
 
 import numpy as np
 from scipy.spatial import ConvexHull
-
-def get_ch_graph(data, rank, n, *args, **kwargs):
-    if n==1:
-        return np.array([])
-    elif n==2:
-        return np.array([[0,1]])
-    elif n==3:
-        return np.array([[0,1],[1,2],[2,0]])
-    else:
-        hull =  ConvexHull(data, qhull_options='QJ')
-        if hull.simplices[0].shape[0]==3:
-            edges = set()
-            for simplex in hull.simplices:
-                for i in range(3):
-                    edge = sorted([simplex[i], simplex[(i + 1) % 3]])
-                    edges.add(tuple(edge))
-            return np.array(list(edges))
-        else:
-            return hull.simplices
 
 
 class CatFrame(metaclass=ABCMeta):
@@ -65,7 +47,7 @@ class CatFrame(metaclass=ABCMeta):
         # ROTATION GROUP
         # --------------
         # Unit Sphere Encoding
-        dist_hash, r_encoding, us_data = enc_us_catpc(data, cat_data, tol=self.tol/dists.max()*dists.min())
+        dist_hash, r_encoding, us_data = enc_us_catpc(data, cat_data, tol=self.tol)
         
         # Build Convex Hull Graph
         us_rank = torch.linalg.matrix_rank(us_data, tol=self.tol)
@@ -138,8 +120,8 @@ class CatFrame(metaclass=ABCMeta):
                 test_vert_vec = us_data[idx]
                 
                 # If they are co-linear then ignore
-                colinear_test = check_colinear(vert0_vec, test_vert_vec, self.tol)
-                if colinear_test > self.tol:
+                colinear_bool = check_colinear(vert0_vec, test_vert_vec, self.tol)
+                if not colinear_bool:
                     vert1_idx = idx
                     break
             
@@ -166,8 +148,8 @@ class CatFrame(metaclass=ABCMeta):
                     test_vert_vec = us_data[idx]
                     
                     # If they are co-linear then ignore
-                    colinear_test = np.abs(np.dot(vert0_vec, test_vert_vec)) 
-                    if colinear_test > self.tol**2:
+                    colinear_bool = check_colinear(vert0_vec, test_vert_vec, self.tol)
+                    if not colinear_bool:
                         vert1_idx = idx
                         break
                 
@@ -190,7 +172,8 @@ class CatFrame(metaclass=ABCMeta):
                         test_vert_vec = us_data[idx]
                         
                         # If they are co-linear then ignore
-                        if np.abs(np.dot(vert0_vec, test_vert_vec)) > self.tol:
+                        colinear_bool = check_colinear(vert0_vec, test_vert_vec, self.tol)
+                        if not colinear_bool:
                             vert1_idx = idx
                             break
                     
@@ -209,9 +192,9 @@ class CatFrame(metaclass=ABCMeta):
                 possible_indices = [i for i in possible_indices if i != vert0_idx]
                 possible_indices = [i for i in possible_indices if i != vert1_idx]
                 for idx in possible_indices:
-                    cond1 = np.abs(np.dot(s0, us_data[idx])) > self.tol
-                    cond2 = np.abs(np.dot(s1, us_data[idx])) > self.tol
-                    if cond1 and cond2:
+                    cond1 = check_colinear(s0, us_data[idx], self.tol)
+                    cond2 = check_colinear(s1, us_data[idx], self.tol)
+                    if not cond1 and not cond2:
                         v2 = idx
                         break
             if v2 is None:
