@@ -41,7 +41,7 @@ args = parser.parse_args()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 qm9 = QM9(root='./data/qm9-2.4.0/')
-frame = Frame(tol=1e-3)
+frame = Frame(tol=1e-2)
 
 atomic_number_to_symbol = {1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'}
 

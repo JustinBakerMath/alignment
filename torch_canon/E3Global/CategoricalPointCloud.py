@@ -33,13 +33,14 @@ class CatFrame(metaclass=ABCMeta):
         # -----------------
         data, frame_t = align_pc_t(data) # Translation group alignment
         cntr_data = data.clone() # TODO: Don't copy just use indexing
-        indices = torch.linalg.norm(data, axis=1) > self.tol
+        dists = torch.linalg.norm(data, axis=1)
+        indices = dists > self.tol
         data, cat_data = data[indices], cat_data[indices]
 
         # ROTATION GROUP
         # --------------
         # Unit Sphere Encoding
-        dist_hash, r_encoding, us_data = enc_us_catpc(data, cat_data, tol=self.tol)
+        dist_hash, r_encoding, us_data = enc_us_catpc(data, cat_data, tol=self.tol/dists.max()*dists.min())
         
         # Build Convex Hull Graph
         us_rank = torch.linalg.matrix_rank(us_data, tol=self.tol)
@@ -81,7 +82,7 @@ class CatFrame(metaclass=ABCMeta):
             possible_indices = sorted_graph[edge][1]
             possible_indices = [i for i in possible_indices if i != v0]
             for idx in possible_indices:
-                if np.abs(np.dot(s0, us_data[idx])) > self.tol:
+                if np.abs(np.dot(s0, us_data[idx])) > self.tol**2:
                     v1 = idx
                     break
             if v1 is None:
@@ -108,8 +109,8 @@ class CatFrame(metaclass=ABCMeta):
                 possible_indices = [i for i in possible_indices if i != v0]
                 possible_indices = [i for i in possible_indices if i != v1]
                 for idx in possible_indices:
-                    cond1 = np.abs(np.dot(s0, us_data[idx])) > self.tol
-                    cond2 = np.abs(np.dot(s1, us_data[idx])) > self.tol
+                    cond1 = np.abs(np.dot(s0, us_data[idx])) > self.tol**2
+                    cond2 = np.abs(np.dot(s1, us_data[idx])) > self.tol**2
                     if cond1 and cond2:
                         v2 = idx
                         break
@@ -123,8 +124,8 @@ class CatFrame(metaclass=ABCMeta):
                     possible_indices = [i for i in possible_indices if i != v0]
                     possible_indices = [i for i in possible_indices if i != v1]
                     for idx in possible_indices:
-                        cond1 = np.abs(np.dot(s0, us_data[idx])) > self.tol
-                        cond2 = np.abs(np.dot(s1, us_data[idx])) > self.tol
+                        cond1 = np.abs(np.dot(s0, us_data[idx])) > self.tol**2
+                        cond2 = np.abs(np.dot(s1, us_data[idx])) > self.tol**2
                         if cond1 and cond2:
                             v2 = idx
                             break
@@ -138,8 +139,8 @@ class CatFrame(metaclass=ABCMeta):
                     possible_indices = [i for i in possible_indices if i != v0]
                     possible_indices = [i for i in possible_indices if i != v1]
                     for idx in possible_indices:
-                        cond1 = np.abs(np.dot(s0, us_data[idx])) > self.tol
-                        cond2 = np.abs(np.dot(s1, us_data[idx])) > self.tol
+                        cond1 = np.abs(np.dot(s0, us_data[idx])) > self.tol**2
+                        cond2 = np.abs(np.dot(s1, us_data[idx])) > self.tol**2
                         if cond1 and cond2:
                             v2 = idx
                     edge += 1
