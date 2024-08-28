@@ -60,7 +60,7 @@ def invert_hash(hash):
 
 def list_rotate(lst):
     idx = lst.index(min(lst))
-    return lst[idx:] + lst[:idx]
+    return lst[idx:] + lst[:idx], idx
 
 
 # Type Tools

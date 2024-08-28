@@ -132,6 +132,11 @@ def project_onto_plane(vectors, plane_normal):
     return vectors - torch.matmul(vectors, plane_normal).unsqueeze(-1)*plane_normal
 
 def angle_between_vectors(v0, v1):
-    value = torch.dot(v0, v1)/(torch.linalg.norm(v0)*torch.linalg.norm(v1)+1e-10)
-    value = torch.clip(value, -1.0, 1.0)
-    return torch.arccos(value)
+    v0_norm = v0 / (torch.linalg.norm(v0) + 1e-10)
+    v1_norm = v1 / (torch.linalg.norm(v1) + 1e-10)
+    dot_product = torch.dot(v0_norm, v1_norm)
+    dot_product = torch.clip(dot_product, -1.0, 1.0)
+    angle = torch.arccos(dot_product).to(torch.float32)
+    if torch.isclose(angle, torch.tensor(torch.pi,dtype=torch.float32), atol=1e-6):
+        angle = torch.tensor(torch.pi)
+    return angle

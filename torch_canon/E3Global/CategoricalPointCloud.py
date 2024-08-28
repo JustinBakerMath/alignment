@@ -27,7 +27,6 @@ from abc import ABCMeta
 import numpy as np
 from scipy.spatial import ConvexHull
 
-
 class CatFrame(metaclass=ABCMeta):
     def __init__(self, tol=1e-4, *args, **kwargs):
         super().__init__()
@@ -43,12 +42,13 @@ class CatFrame(metaclass=ABCMeta):
         dists = torch.linalg.norm(data, axis=1)
         indices = dists > self.tol
         data, cat_data = data[indices], cat_data[indices]
+        dists = torch.linalg.norm(data, axis=1)
 
         # ROTATION GROUP
         # --------------
         # Unit Sphere Encoding
         dist_hash, r_encoding, us_data = enc_us_catpc(data, cat_data, tol=self.tol)
-        
+
         # Build Convex Hull Graph
         us_rank = torch.linalg.matrix_rank(us_data, tol=self.tol)
         us_n = us_data.shape[0]
@@ -58,9 +58,9 @@ class CatFrame(metaclass=ABCMeta):
         assert all(bool_lst), 'Convex Hull is not correct'
 
         # Encode Convex Hull Geometry
-        adj_list = build_adjacency_list(ch_graph)
+        us_adj_dict = build_adjacency_list(ch_graph)
         dg = direct_graph(ch_graph)
-        g_hash, g_encoding = enc_ch_pc(us_data, adj_list, us_rank)
+        g_hash, g_encoding = enc_ch_pc(us_data, us_adj_dict, us_rank, tol=self.tol)
 
         # COMBINE ENCODINGS
         n_encoding = {}
@@ -73,160 +73,86 @@ class CatFrame(metaclass=ABCMeta):
         self.hopcroft = PartitionRefinement(dfa)
         self.hopcroft.refine(dfa)
         sorted_graph = convert_partition(self.hopcroft, dist_hash, g_hash, r_encoding, g_encoding)
-        pth = self.traverse(sorted_graph, us_data, us_rank)
+        pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
         data, frame_R = align_pc_s3(cntr_data, us_data, pth)
         return data, frame_R, frame_t
 
-    def traverse(self, sorted_graph, us_data, us_rank):
+    def traverse(self, sorted_graph, us_adj_dict, us_data, us_rank):
 
         # ~~~
         # Start on the first set of symmetric edges and with the first node
-        vert0_idx, sym_edge_idx = self.find_vert0(sorted_graph)
+        vert0_idx, dfa_node_idx = self.find_vert0(us_adj_dict, sorted_graph)
         if us_rank == 1:
             return [vert0_idx]
         vert0_vec = us_data[vert0_idx]
 
         # ~~~
         # Find the second node
-        vert1_idx = self.find_vert1(vert0_idx, vert0_vec, sym_edge_idx, sorted_graph, us_data)
+        vert1_idx, dfa_node_idx = self.find_vert1(vert0_idx, vert0_vec, dfa_node_idx, us_adj_dict, sorted_graph, us_data)
         if us_rank == 2:
             return [vert0_idx, vert1_idx]
         vert1_vec = us_data[vert1_idx]
 
-        v2 = self.v2_subroutine(vert0_idx, vert1_idx, sym_edge_idx, sorted_graph, us_data, us_rank)
+        v2 = self.v2_subroutine(vert0_idx, vert1_idx, dfa_node_idx, sorted_graph, us_adj_dict, us_data, us_rank)
         if v2 is None:
-            v2 = self.v2_subroutine(vert1_idx, vert0_idx, sym_edge_idx, sorted_graph, us_data, us_rank)
-        
+            v2 = self.v2_subroutine(vert1_idx, vert0_idx, dfa_node_idx, sorted_graph, us_adj_dict, us_data, us_rank)
+
         assert v2 is not None, f'v2 is None\n {vert0_idx},{vert1_idx}\n \n {sorted_graph}'
 
         return [vert0_idx, vert1_idx, v2]
 
-    def find_vert0(self, sorted_graph):
+    def find_vert0(self, us_adj_dict, sorted_graph):
         symmetry_group = 0
         left_edge_vertices = 0
         first_vertex = 0
-        return sorted_graph[symmetry_group][left_edge_vertices][first_vertex], symmetry_group
+        vert0_idx = sorted_graph[symmetry_group][left_edge_vertices][first_vertex]
+        return vert0_idx, symmetry_group
 
-    def find_vert1(self, vert0_idx, vert0_vec, sym_edge_idx, sorted_graph, us_data):
-        vert1_idx = None
-        # First we will check among all right nodes connected to this node
-        while vert1_idx is None and sym_edge_idx < len(sorted_graph):
+    def find_vert1(self, vert0_idx, vert0_vec, dfa_node_idx, us_adj_dict, sorted_graph, us_data):
+        return us_adj_dict[vert0_idx][0], None
 
-            test_vert_idxs = sorted_graph[sym_edge_idx][1] # Get connected edges in symmetry edge
-            test_vert_idxs = [i for i in test_vert_idxs if i != vert0_idx] # Ignore if it's v0 (may happen due to symmetry BD)
+    def v2_subroutine(self, vert0_idx, vert1_idx, dfa_node_idx, sorted_graph, us_adj_dict, us_data, us_rank):
+        vert2_idx = None
+        vert0_vec = us_data[vert0_idx]
+        vert1_vec = us_data[vert1_idx]
+
+        for idx in us_adj_dict[vert1_idx]:
+          if idx != vert0_idx:
+            return idx
+
+
+        # Reset the dfa_node_idx v1 was received from a right hand node
+        if dfa_node_idx is None:
+          dfa_node_idx = 0
+          for i in range(len(sorted_graph)):
+            if vert1_idx in sorted_graph[i][0]:
+              dfa_node_idx = i
+              break
+
+        # # Check DFA among right nodes (order 0)
+        # ~~~
+        while vert2_idx is None and dfa_node_idx < len(sorted_graph):
+
+            test_vert_idxs = sorted_graph[dfa_node_idx][1] # Get connected edges in symmetry edge
+            test_vert_idxs = [i for i in test_vert_idxs if (i != vert0_idx) and (i!=vert1_idx)] # Ignore if it's v0 (may happen due to symmetry BD)
+            us_adj_idxs = us_adj_dict[vert1_idx]
+            test_vert_idxs = [i for i in test_vert_idxs if i in us_adj_idxs] # Ignore if it's not in the ch_graph
 
             # testing vertices
             for idx in test_vert_idxs:
                 test_vert_vec = us_data[idx]
-                
-                # If they are co-linear then ignore
-                colinear_bool = check_colinear(vert0_vec, test_vert_vec, self.tol)
-                if not colinear_bool:
-                    vert1_idx = idx
-                    break
-            
-            # Try to find the next possible connected node
-            if vert1_idx is None:
-              sym_edge_idx += 1
-              while (sym_edge_idx < len(sorted_graph)) and (not vert0_idx in sorted_graph[sym_edge_idx][0]):
-                sym_edge_idx += 1
-              
 
-        if vert1_idx is not None:
-            return vert1_idx
+                # ignore if co-linear
+                colinear0_bool = check_colinear(vert0_vec, test_vert_vec, self.tol)
+                colinear1_bool = check_colinear(vert1_vec, test_vert_vec, self.tol)
+                if (not colinear0_bool) and (not colinear1_bool):
+                    vert2_idx = idx
+                    return vert2_idx
 
-        # Now we need to check among all left nodes
-        else:
-            sym_edge_idx = 0
-            while vert1_idx is None and sym_edge_idx < len(sorted_graph):
-    
-                test_vert_idxs = sorted_graph[sym_edge_idx][0] # Get connected edges in symmetry edge
-                test_vert_idxs = [i for i in test_vert_idxs if i != vert0_idx] # Ignore if it's connected to v0
-    
-                # testing vertices
-                for idx in test_vert_idxs:
-                    test_vert_vec = us_data[idx]
-                    
-                    # If they are co-linear then ignore
-                    colinear_bool = check_colinear(vert0_vec, test_vert_vec, self.tol)
-                    if not colinear_bool:
-                        vert1_idx = idx
-                        break
-                
-                # Now we can consider any node so consider any edge
-                if vert1_idx is None:
-                    sym_edge_idx += 1
-                
-            if vert1_idx is not None:
-                  return vert1_idx
-              # In some case where the only non co-linear point is connected to some point far far away
-            else:
-                sym_edge_idx = 0
-                while vert1_idx is None and sym_edge_idx < len(sorted_graph):
-        
-                    test_vert_idxs = sorted_graph[sym_edge_idx][1] # Get connected edges in symmetry edge
-                    test_vert_idxs = [i for i in test_vert_idxs if i != vert0_idx] # Ignore if it's connected to v0
-        
-                    # testing vertices
-                    for idx in test_vert_idxs:
-                        test_vert_vec = us_data[idx]
-                        
-                        # If they are co-linear then ignore
-                        colinear_bool = check_colinear(vert0_vec, test_vert_vec, self.tol)
-                        if not colinear_bool:
-                            vert1_idx = idx
-                            break
-                    
-                    # Now we can consider any node so consider any edge
-                    if vert1_idx is None:
-                        sym_edge_idx += 1
-                return vert1_idx
+            # iterate dfa
+            if vert2_idx is None:
+              dfa_node_idx += 1
+              while (dfa_node_idx < len(sorted_graph)) and (not vert1_idx in sorted_graph[dfa_node_idx][0]):
+                dfa_node_idx += 1
 
-    def v2_subroutine(self, vert0_idx, vert1_idx, sym_edge_idx, sorted_graph, us_data, us_rank):
-        s0 = us_data[vert0_idx]
-        s1 = us_data[vert1_idx]
-        v2 = None
-        while sym_edge_idx < len(sorted_graph) and v2 is None:
-            if vert1_idx in sorted_graph[sym_edge_idx][0]:
-                possible_indices = sorted_graph[sym_edge_idx][1]
-                possible_indices = [i for i in possible_indices if i != vert0_idx]
-                possible_indices = [i for i in possible_indices if i != vert1_idx]
-                for idx in possible_indices:
-                    cond1 = check_colinear(s0, us_data[idx], self.tol)
-                    cond2 = check_colinear(s1, us_data[idx], self.tol)
-                    if not cond1 and not cond2:
-                        v2 = idx
-                        break
-            if v2 is None:
-                sym_edge_idx += 1
-        if v2 is None:
-            sym_edge_idx = 0
-            while sym_edge_idx < len(sorted_graph) and v2 is None:
-                if vert0_idx in sorted_graph[sym_edge_idx][0]:
-                    possible_indices = sorted_graph[sym_edge_idx][1]
-                    possible_indices = [i for i in possible_indices if i != vert0_idx]
-                    possible_indices = [i for i in possible_indices if i != vert1_idx]
-                    for idx in possible_indices:
-                        cond1 = np.abs(np.dot(s0, us_data[idx])) > self.tol
-                        cond2 = np.abs(np.dot(s1, us_data[idx])) > self.tol
-                        if cond1 and cond2:
-                            v2 = idx
-                            break
-                if v2 is None:
-                    sym_edge_idx += 1
-        if v2 is None:
-            sym_edge_idx = 0
-            while sym_edge_idx < len(sorted_graph) and v2 is None:
-                if not(vert0_idx in sorted_graph[sym_edge_idx][0]) and not (vert1_idx in sorted_graph[sym_edge_idx][0]):
-                    possible_indices = sorted_graph[sym_edge_idx][0]
-                    possible_indices = [i for i in possible_indices if i != vert0_idx]
-                    possible_indices = [i for i in possible_indices if i != vert1_idx]
-                    for idx in possible_indices:
-                        cond1 = np.abs(np.dot(s0, us_data[idx])) > self.tol
-                        cond2 = np.abs(np.dot(s1, us_data[idx])) > self.tol
-                        if cond1 and cond2:
-                            v2 = idx
-                    sym_edge_idx += 1
-                else:
-                    v2 = sorted_graph[sym_edge_idx][0][0]
-        return v2
+        return vert2_idx

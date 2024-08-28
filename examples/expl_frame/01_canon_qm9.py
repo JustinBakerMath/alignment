@@ -53,7 +53,10 @@ def compute_loss(i, pc_data, normalized_data, cat_data):
     random_translation = np.random.rand(3)
 
     g_pc_data = (random_rotation @ (pc_data + random_translation).numpy().T).T
-    g_normalized_data, g_frame_R, g_frame_t = frame.get_frame(g_pc_data, cat_data)
+    shuffle = np.random.permutation(len(g_pc_data))
+    g_pc_data = g_pc_data[shuffle]
+    g_cat_data = cat_data[shuffle]
+    g_normalized_data, g_frame_R, g_frame_t = frame.get_frame(g_pc_data, g_cat_data)
     loss = wasserstein_distance_nd(normalized_data, g_normalized_data)
     return loss
 
@@ -73,8 +76,8 @@ for idx,data in enumerate(qm9[:args.n_data]):
 
     pc_data = data.pos
     cat_data = data.z.numpy()
-
     data_rank = torch.linalg.matrix_rank(pc_data)
+
     normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
     symbols = [atomic_number_to_symbol[z] for z in cat_data]
 
@@ -88,7 +91,7 @@ for idx,data in enumerate(qm9[:args.n_data]):
         
     for i in range(args.n_g_act):
         loss = compute_loss(i, pc_data, normalized_data, cat_data)
-        if loss > 1e-3:
+        if loss > 1e-2:
             try:
                 pg = PointGroup(normalized_data, symbols).get_point_group()
             except:
