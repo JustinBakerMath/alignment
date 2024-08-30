@@ -141,7 +141,6 @@ def unittest_enc_ch_pc(val, tol):
 def test_enc_us_pc(val, tol):
     unittest_enc_us_pc(val, tol)
 
-
 @pytest.mark.parametrize('val',[1,2,3])
 @pytest.mark.parametrize('tol',[1e-12])
 def test_enc_us_catpc(val, tol):

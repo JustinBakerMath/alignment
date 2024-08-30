@@ -10,7 +10,8 @@ Includes:
 import torch
 
 from torch_canon.utilities import custom_round, list_rotate
-from torch_canon.E3Global.align3D import cartesian2spherical_xtheta, project_onto_plane, angle_between_vectors
+from torch_canon.E3Global.align3D import cartesian2spherical_xtheta, project_onto_plane, angle_between_vectors 
+from torch_canon.E3Global.geometry3D import check_colinear, spherical_angles_between_vectors
 
 # Unit Sphere (US)
 #----------------------------
@@ -21,7 +22,7 @@ def enc_us_pc(data, tol=1e-16, **kwargs):
     # Project and reduce locally close points (n^2 complexity)
     distances = data.norm(dim=1, keepdim=True)
     proj_data =  data/distances
-    close_proj_point_idxs, uq_indx = reduce_us(proj_data, tol=tol)
+    close_proj_point_idxs, uq_indx = reduce_us(proj_data, data, tol=tol)
 
     # Encode distances
     for i,point_idx in enumerate(close_proj_point_idxs):
@@ -40,10 +41,11 @@ def enc_us_catpc(data, cat_data, tol=1e-16, **kwargs):
     # Project and reduce locally close points (n^2 complexity)
     distances = data.norm(dim=1, keepdim=True)
     proj_data =  data/distances
-    locally_close_idx_arrs, uq_indx = reduce_us(proj_data, tol=tol)
+    locally_close_idx_arrs, uq_indx = reduce_us(proj_data, data, tol=tol)
 
     # Encode information while pooling locally close points
     for i,idx_arr in enumerate(locally_close_idx_arrs):
+        proj_data[uq_indx[i]] = proj_data[idx_arr].mean(dim=0)
         dists = [(custom_round(distances[idx].item(),tol), custom_round(cat_data[idx],tol))  for idx in idx_arr] # Collect local info
         dists = tuple(sorted(dists)) # Sort data
         if dists not in dists_hash:
@@ -52,50 +54,46 @@ def enc_us_catpc(data, cat_data, tol=1e-16, **kwargs):
 
     return dists_hash, encoding, proj_data[uq_indx]
 
-
-
 # Convex Hull (CH)
 #----------------------------
-def enc_ch_pc(us_data, adj_list, us_rank, tol=1e-16):
+def enc_ch_pc(us_data, edge_dict, us_rank, tol=1e-16):
     encoding = {}
     g_hash = {}
 
     # Encode edge information
-    for point in adj_list.keys():
-        r_ij = us_data[adj_list[point]]-us_data[point]
-
-        # distance encoding
-        if us_rank == 1: # 
-            d_ij = torch.zeros_like(torch.linalg.norm(r_ij, axis=1))
-        else:
-            d_ij = torch.linalg.norm(r_ij, axis=1)
-
-        # angle encoding
+    for point in edge_dict.keys():
+        # need to check clock-wise
+        r_ij = us_data[edge_dict[point]]-us_data[point]
         projection = project_onto_plane(r_ij, us_data[point])
-        angle = []
-        for i in range(len(projection)):
-            if us_rank == 3:
-                angle += [angle_between_vectors(projection[i], projection[i-1])]
-            else:
-                angle += [0]
+        ref_vec = projection.mean(dim=0)
+        angles = [(angle_between_vectors(projection[i], ref_vec), edge_dict[point][i]) for i in range(len(edge_dict[point]))]
+        rot_order = [point for _, point in sorted(angles, key=lambda x: x[0], reverse=True)]
 
+        edge_dict[point] = rot_order
+        # angle encoding
+        angle = []
+        for i, idx in enumerate(edge_dict[point]):
+            angle.append(spherical_angles_between_vectors(us_data[edge_dict[point][i-1]], us_data[point], us_data[idx]))
+
+        d_ij = [angle_between_vectors(us_data[nbr], us_data[point]) for nbr in edge_dict[point]]
         # lexicographical shift
-        lst = [(custom_round(a,tol),custom_round(d,tol)) for a,d in zip(angle, d_ij)]
-        lst = tuple(list_rotate(lst))
+        angles = [custom_round(a.item(),tol) for a in angle]
+        dists = [custom_round(d.item(),tol) for d in d_ij]
+        angles, idx = tuple(list_rotate(angles))
+        dists = dists[idx:] + dists[:idx]
+        lst = tuple(zip(angles,dists))
         if lst not in g_hash:
             g_hash[lst] = id(lst)
         encoding[point] = g_hash[lst]
     return g_hash, encoding
 
 
-
 # Reduction Tools
 #----------------
-def reduce_us(us_data, tol=1e-16):
+def reduce_us(us_data, data, tol=1e-16):
     similar_indices = []
     uq_indices = []
-    sph_data = torch.tensor([cartesian2spherical_xtheta(*v) for v in us_data], dtype=torch.float32)
-    I = [i for i in range(sph_data.shape[0])]
+    I = [i for i in range(us_data.shape[0])]
     while(I):
         i = I[0]
         similar_indices.append([i])
@@ -103,11 +101,13 @@ def reduce_us(us_data, tol=1e-16):
         J = [j for j in I[1:]]
         while(J):
             j=J[0]
-            close_theta = torch.isclose(sph_data[i][1], sph_data[j][1], atol=tol, rtol=tol)
-            close_gamma = torch.isclose(sph_data[i][2], sph_data[j][2], atol=tol, rtol=tol)
-            if close_theta and close_gamma:
-                similar_indices[-1].append(j)
-                I.remove(j)
+            dotij = torch.dot(us_data[i], us_data[j]).clamp(-1,1)
+            is_close  = torch.arccos(dotij) < tol
+            if is_close:
+                colinear = check_colinear(data[i], data[j], tol)
+                if colinear:
+                    similar_indices[-1].append(j)
+                    I.remove(j)
             J.remove(j)
         I.remove(i)
     return similar_indices, uq_indices

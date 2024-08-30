@@ -29,14 +29,16 @@ from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
 # -----
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_data', type=int, default=1, help='Random seed')
-parser.add_argument('--n_transform', type=int, default=1, help='Random seed')
+parser.add_argument('--n_g_act', type=int, default=1, help='Random seed')
+parser.add_argument('--tol', type=float, default=1e-3, help='Tolerance for frame computation.')
+parser.add_argument('--err', type=float, default=1e-6, help='Level of noise added to the point cloud.')
 parser.add_argument('--frq_log', type=int, default=10, help='Random seed')
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 qm9 = QM9(root='./data/qm9-2.4.0/')
-frame = Frame()
+frame = Frame(tol=args.tol)
 
 atomic_number_to_symbol = {
     1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'
@@ -51,9 +53,13 @@ data_rank3_loss, data_rank3_count, data_rank3_moved = 0,0,0
 def compute_loss(i, pc_data, normalized_data, cat_data):
     random_rotation = R.random().as_matrix()
     random_translation = np.random.rand(3)
+    random_err = np.random.rand(*pc_data.shape) * args.err
 
-    g_pc_data = (random_rotation @ (pc_data + random_translation).numpy().T).T
-    g_normalized_data, rot = frame.get_frame(g_pc_data, cat_data)
+    g_pc_data = (random_rotation @ (pc_data + random_translation + random_err).numpy().T).T
+    shuffle = np.random.permutation(len(g_pc_data))
+    g_pc_data = g_pc_data[shuffle]
+    g_cat_data = cat_data[shuffle]
+    g_normalized_data, g_frame_R, g_frame_t = frame.get_frame(g_pc_data, g_cat_data)
     loss = wasserstein_distance_nd(normalized_data, g_normalized_data)
     return loss
 
@@ -68,13 +74,14 @@ for idx,data in enumerate(qm9[:args.n_data]):
     smiles = ''.join([atomic_number_to_symbol[z] for z in data.z.numpy()])
 
 
-    logging.info(f"Process Completed {idx+1}/{args.n_data} iterations.")
+    if idx % args.frq_log == 0:
+        logging.info(f"Process Completed {idx+1}/{args.n_data} iterations.")
 
     pc_data = data.pos
     cat_data = data.z.numpy()
-
     data_rank = torch.linalg.matrix_rank(pc_data)
-    normalized_data, rot = frame.get_frame(pc_data, cat_data)
+
+    normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
     symbols = [atomic_number_to_symbol[z] for z in cat_data]
 
     moved = compute_loss(0, pc_data, normalized_data, cat_data)
@@ -85,8 +92,14 @@ for idx,data in enumerate(qm9[:args.n_data]):
     else:
         data_rank3_moved += moved
         
-    for i in range(args.n_transform):
+    for i in range(args.n_g_act):
         loss = compute_loss(i, pc_data, normalized_data, cat_data)
+        if loss > 1e-2:
+            try:
+                pg = PointGroup(normalized_data, symbols).get_point_group()
+            except:
+                pg = 'C1'
+            logging.info(f'{idx}: ({smiles}, {pg}) - {loss:.5f}')
 
         if data_rank == 1:
             data_rank1_loss += loss

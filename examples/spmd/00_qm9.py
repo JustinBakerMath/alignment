@@ -40,22 +40,18 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 start_time = time()
 
 qm9 = QM9(root='./data/qm9-2.4.0/')
-frame = Frame()
+frame = Frame(tol=1e-2)
 
 atomic_number_to_symbol = {
     1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'
     }
 loss = 0
+recon_loss = 0
 
 # Helper Functions
 # ----------------
-def compute_loss(i, pc_data, normalized_data, cat_data):
-    random_rotation = R.random().as_matrix()
-    random_translation = np.random.rand(3)
-
-    g_pc_data = (random_rotation @ (pc_data + random_translation).numpy().T).T
-    g_normalized_data, rot = frame.get_frame(g_pc_data, cat_data)
-    loss = wasserstein_distance_nd(normalized_data, g_normalized_data)
+def compute_loss(data, data_transformed):
+    loss = wasserstein_distance_nd(data, data_transformed)
     return loss
 
 
@@ -90,11 +86,16 @@ for idx,data in enumerate(qm9[start_idx:end_idx]):
     cat_data = data.z.numpy()
 
     data_rank = torch.linalg.matrix_rank(pc_data)
-    normalized_data, rot = frame.get_frame(pc_data, cat_data)
+    normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
 
-    loss += compute_loss(idx, pc_data, normalized_data, cat_data)
+    loss += compute_loss(pc_data, normalized_data)
+
+    inv_R = torch.linalg.inv(frame_R)
+    recon_data = (inv_R @ normalized_data.T).T + frame_t
+    recon_loss = compute_loss(pc_data, recon_data)
 
 loss_total = comm.reduce(loss, op=MPI.SUM, root=0)
+recon_loss_total = comm.reduce(recon_loss, op=MPI.SUM, root=0)
 
 # MPI Finalize
 comm.Barrier()
@@ -102,5 +103,6 @@ MPI.Finalize()
 
 if rank == 0:
     logging.info(f'Average move {loss_total/n_data:.4f}')
+    logging.info(f'Reconstruction loss {recon_loss_total/n_data:.4f}')
     logging.info(f'Time: {time()-start_time:.4f}')
     logging.info('Done!')
