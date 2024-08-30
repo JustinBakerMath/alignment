@@ -30,13 +30,15 @@ from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
 parser = argparse.ArgumentParser()
 parser.add_argument('--n_data', type=int, default=1, help='Random seed')
 parser.add_argument('--n_g_act', type=int, default=1, help='Random seed')
+parser.add_argument('--tol', type=float, default=1e-3, help='Tolerance for frame computation.')
+parser.add_argument('--err', type=float, default=1e-6, help='Level of noise added to the point cloud.')
 parser.add_argument('--frq_log', type=int, default=10, help='Random seed')
 args = parser.parse_args()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 qm9 = QM9(root='./data/qm9-2.4.0/')
-frame = Frame(tol=1e-2)
+frame = Frame(tol=args.tol)
 
 atomic_number_to_symbol = {
     1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'
@@ -51,8 +53,9 @@ data_rank3_loss, data_rank3_count, data_rank3_moved = 0,0,0
 def compute_loss(i, pc_data, normalized_data, cat_data):
     random_rotation = R.random().as_matrix()
     random_translation = np.random.rand(3)
+    random_err = np.random.rand(*pc_data.shape) * args.err
 
-    g_pc_data = (random_rotation @ (pc_data + random_translation).numpy().T).T
+    g_pc_data = (random_rotation @ (pc_data + random_translation + random_err).numpy().T).T
     shuffle = np.random.permutation(len(g_pc_data))
     g_pc_data = g_pc_data[shuffle]
     g_cat_data = cat_data[shuffle]
