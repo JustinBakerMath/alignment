@@ -76,7 +76,7 @@ class PermCatFrame(metaclass=ABCMeta):
         pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
         data, frame_R = align_pc_s3(cntr_data, us_data, pth)
         frame_P = self.sort(sorted_graph)
-        self._save(data, frame_P, frame_R, frame_t)
+        self._save(data, frame_P, frame_R, frame_t, sorted_graph)
         return data[frame_P], frame_P, frame_R, frame_t
 
     def traverse(self, sorted_graph, us_adj_dict, us_data, us_rank):
@@ -168,15 +168,10 @@ class PermCatFrame(metaclass=ABCMeta):
                         idx.append(node)
         return idx
 
-    def _save(self, data, frame_P, frame_R, frame_t, sorted_graph):
+    def _save(self, data, frame_P, frame_R, frame_t, dfa):
         self.data = data
+        self.frame_P = frame_P
         self.frame_R = frame_R
         self.frame_t = frame_t
-        self.sorted_graph = sorted_graph
-        self.sorted_nodes = []
-        for lst in sorted_graphs:
-            for nodes in lst:
-                for node in nodes:
-                    if node not in self.sorted_nodes:
-                        self.sorted_nodes.append(node)
+        self.dfa = dfa
         pass
