@@ -131,6 +131,14 @@ def planar_normal(v0, v1):
 def project_onto_plane(vectors, plane_normal):
     return vectors - torch.matmul(vectors, plane_normal).unsqueeze(-1)*plane_normal
 
+def angle_between_vectors(a, b, dim=-1):
+    a_norm = a.norm(dim=dim, keepdim=True)
+    b_norm = b.norm(dim=dim, keepdim=True)
+    return 2 * torch.atan2(
+            (a * b_norm - a_norm * b).norm(dim=dim),
+            (a * b_norm + a_norm * b).norm(dim=dim))
+
+"""
 def angle_between_vectors(v0, v1):
     v0_norm = v0 / (torch.linalg.norm(v0) + 1e-10)
     v1_norm = v1 / (torch.linalg.norm(v1) + 1e-10)
@@ -140,3 +148,4 @@ def angle_between_vectors(v0, v1):
     if torch.isclose(angle, torch.tensor(torch.pi,dtype=torch.float32), atol=1e-6):
         angle = torch.tensor(torch.pi)
     return angle
+"""

@@ -30,7 +30,7 @@ def enc_us_pc(data, tol=1e-16, **kwargs):
         dists = [custom_round(distances[idx],tol) for idx in point_idx]
         dists = tuple(sorted(dists)) # sort distances
         if dists not in dists_hash:
-            dists_hash[dists] = id(dists) # Hash data
+            dists_hash[dists] = len(dists_hash)#id(dists) # Hash data
         encoding[i] = dists_hash[dists]
 
     return dists_hash, encoding, proj_data[uq_indx]
@@ -50,7 +50,7 @@ def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, 
         dists = [(custom_round(distances[idx].item(),tol), custom_round(cat_data[idx].item(),tol))  for idx in idx_arr] # Collect local info
         dists = tuple(sorted(dists)) # Sort data
         if dists not in dists_hash:
-            dists_hash[dists] = id(dists) # Hash data
+            dists_hash[dists] = len(dists_hash)#id(dists) # Hash data
         #else:
             #print('Duplicate')
         encoding[i] = dists_hash[dists]
@@ -66,18 +66,22 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
     # Encode edge information
     for point in edge_dict.keys():
         #ipdb.set_trace()
-        # need to check clock-wise
-        r_ij = us_data[edge_dict[point]]-us_data[point]
+        # need to get clock-wise order
+        r_ij = us_data[edge_dict[point]]#-us_data[point]
+        r_ij = r_ij/(r_ij.norm(dim=1, keepdim=True)+1e-16)
         projection = project_onto_plane(r_ij, us_data[point])
         ref_vec = projection.mean(dim=0)
-        angles = [(angle_between_vectors(projection[i], ref_vec), edge_dict[point][i]) for i in range(len(edge_dict[point]))]
-        rot_order = [point for _, point in sorted(angles, key=lambda x: x[0], reverse=True)]
+        ref_vec = ref_vec/(ref_vec.norm()+1e-16)
+        angles = [angle_between_vectors(projection[i], ref_vec).item() for i in range(len(edge_dict[point]))]
+        angles = [custom_round(a,tol) for a in angles]
+        tuples = [(angles[i],edge_dict[point][i]) for i in range(len(edge_dict[point]))]
+        rot_order = [point for _, point in sorted(tuples, key=lambda x: (x[0], x[1]), reverse=True)]
 
         edge_dict[point] = rot_order
         # angle encoding
         angle = []
         for i, idx in enumerate(edge_dict[point]):
-            angle.append(spherical_angles_between_vectors(us_data[edge_dict[point][i-1]], us_data[point], us_data[idx]))
+            angle.append(spherical_angles_between_vectors(us_data[edge_dict[point][i-1]], us_data[point], us_data[idx], tol=tol))
 
         d_ij = [angle_between_vectors(us_data[nbr], us_data[point]) for nbr in edge_dict[point]]
         # lexicographical shift
@@ -88,7 +92,7 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
         lst = tuple(zip(angles,dists))
         lst,_ = list_rotate(lst)
         if lst not in g_hash:
-            g_hash[lst] = id(lst)
+            g_hash[lst] = len(g_hash) #id(lst)
         encoding[point] = g_hash[lst]
     return g_hash, encoding
 
