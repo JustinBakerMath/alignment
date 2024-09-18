@@ -17,7 +17,7 @@ from torch_canon.Hopcroft import PartitionRefinement
 from torch_canon.utilities import build_adjacency_list, check_type, direct_graph
 
 from torch_canon.E3Global.align3D import align_pc_t, align_pc_s3
-from torch_canon.E3Global.dfa3D import construct_dfa, convert_partition, traversal
+from torch_canon.E3Global.dfa3D import construct_dfa, convert_partition
 from torch_canon.E3Global.encode3D import enc_us_catpc, enc_ch_pc
 from torch_canon.E3Global.geometry3D import check_colinear
 from torch_canon.E3Global.qhull import get_ch_graph
@@ -25,31 +25,12 @@ from torch_canon.E3Global.qhull import get_ch_graph
 from abc import ABCMeta
 
 import numpy as np
+from scipy.spatial import ConvexHull
 
-class CatFrame(metaclass=ABCMeta):
-    def __init__(self, tol=1e-4, save=False, *args, **kwargs):
+class PermCatFrame(metaclass=ABCMeta):
+    def __init__(self, tol=1e-4, *args, **kwargs):
         super().__init__()
         self.tol = tol
-        self.save = save
-
-        self.dist_hash = None
-        self.g_hash = None
-        self.dist_encoding = None
-        self.g_encoding = None
-        self.n_encoding = None
-
-    def _save(self, data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sort_pth):
-        self.data = data
-        self.frame_R = frame_R
-        self.frame_t = frame_t
-        self.sorted_graph = sorted_graph
-        self.dist_hash = dist_hash
-        self.g_hash = g_hash
-        self.dist_encoding = [dist_encoding[i] for i in sort_pth]
-        self.g_encoding = [g_encoding[i] for i in sort_pth]
-        self.n_encoding = [n_encoding[i] for i in sort_pth]
-        self.sort_pth = sort_pth
-        pass
 
     def get_frame(self, data, cat_data, *args, **kwargs):
         data = check_type(data) # Assert Type
@@ -66,9 +47,7 @@ class CatFrame(metaclass=ABCMeta):
         # ROTATION GROUP
         # --------------
         # Unit Sphere Encoding
-        dist_hash, dist_encoding, us_data = enc_us_catpc(
-                data, cat_data, 
-                dist_hash=self.dist_hash, dist_encoding=None, tol=self.tol)
+        dist_hash, r_encoding, us_data = enc_us_catpc(data, cat_data, tol=self.tol)
 
         # Build Convex Hull Graph
         us_rank = torch.linalg.matrix_rank(us_data, tol=self.tol)
@@ -81,27 +60,24 @@ class CatFrame(metaclass=ABCMeta):
         # Encode Convex Hull Geometry
         us_adj_dict = build_adjacency_list(ch_graph)
         dg = direct_graph(ch_graph)
-        g_hash, g_encoding = enc_ch_pc(
-                us_data, us_adj_dict, us_rank,
-                g_hash=self.g_hash, g_encoding=None, tol=self.tol)
+        g_hash, g_encoding = enc_ch_pc(us_data, us_adj_dict, us_rank, tol=self.tol)
 
         # COMBINE ENCODINGS
         n_encoding = {}
         # for each node combine ENCODINGS
         for i in range(us_n):
-            n_encoding[i] = (dist_encoding[i], g_encoding[i])
+            n_encoding[i] = (r_encoding[i], g_encoding[i])
 
         # CONSTRUCT DFA
         dfa = construct_dfa(n_encoding, dg)
         self.hopcroft = PartitionRefinement(dfa)
         self.hopcroft.refine(dfa)
-        sorted_graph = convert_partition(self.hopcroft, dist_hash, g_hash, dist_encoding, g_encoding)
-        sort_pth = traversal(sorted_graph, us_adj_dict, us_data, us_rank)
-        lindep_pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
-        data, frame_R = align_pc_s3(cntr_data, us_data, lindep_pth)
-        if self.save:
-            self._save(data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sort_pth)
-        return data, frame_R, frame_t
+        sorted_graph = convert_partition(self.hopcroft, dist_hash, g_hash, r_encoding, g_encoding)
+        pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
+        data, frame_R = align_pc_s3(cntr_data, us_data, pth)
+        frame_P = self.sort(sorted_graph)
+        self._save(data, frame_P, frame_R, frame_t, sorted_graph)
+        return data[frame_P], frame_P, frame_R, frame_t
 
     def traverse(self, sorted_graph, us_adj_dict, us_data, us_rank):
 
@@ -182,3 +158,20 @@ class CatFrame(metaclass=ABCMeta):
                 dfa_node_idx += 1
 
         return vert2_idx
+
+    def sort(self, sorted_graph):
+        idx = []
+        for lst in sorted_graph:
+            for nodes in lst:
+                for node in nodes:
+                    if node not in idx:
+                        idx.append(node)
+        return idx
+
+    def _save(self, data, frame_P, frame_R, frame_t, dfa):
+        self.data = data
+        self.frame_P = frame_P
+        self.frame_R = frame_R
+        self.frame_t = frame_t
+        self.dfa = dfa
+        pass

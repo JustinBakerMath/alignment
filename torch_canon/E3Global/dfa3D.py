@@ -1,5 +1,6 @@
 import ast
 from torch_canon.utilities import get_key
+import ipdb
 
 def construct_dfa(encoding, graph):
     dfa_set = list()
@@ -45,3 +46,28 @@ def convert_partition(hopcroft, dist_hash, g_hash, r_encoding, g_encoding):
     sorted_inidces = [i for i,_ in indexed_edges]
     ret_graph = [ret_graph[i] for i in sorted_inidces]
     return ret_graph
+
+
+def traversal(sorted_graph, us_adj_dict, us_data, us_rank):
+    symmetry_group = 0
+    path = []
+    visited_symmetry_groups = [False for _ in range(len(sorted_graph))]
+
+    path.append(sorted_graph[symmetry_group][0][0])
+    while False in visited_symmetry_groups and len(path) < us_data.shape[0]:
+        visited_symmetry_groups[symmetry_group] = True
+        source = sorted_graph[symmetry_group][0][0]
+        target = sorted_graph[symmetry_group][1][0]
+        #ipdb.set_trace()
+        for idx, (sources, targets) in enumerate(sorted_graph):
+            if target in sources and source in targets:
+                continue
+            elif target in sources and not visited_symmetry_groups[idx] and source not in targets:
+                symmetry_group = idx
+                path.append(target)
+                break
+            else:
+                if False in visited_symmetry_groups:
+                    symmetry_group = visited_symmetry_groups.index(False)
+
+    return path
