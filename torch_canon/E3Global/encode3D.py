@@ -46,10 +46,12 @@ def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, 
     # Encode information while pooling locally close points
     for i,idx_arr in enumerate(locally_close_idx_arrs):
         proj_data[uq_indx[i]] = proj_data[idx_arr].mean(dim=0)
-        dists = [(custom_round(distances[idx].item(),tol), custom_round(cat_data[idx],tol))  for idx in idx_arr] # Collect local info
+        dists = [(custom_round(distances[idx].item(),tol), custom_round(cat_data[idx].item(),tol))  for idx in idx_arr] # Collect local info
         dists = tuple(sorted(dists)) # Sort data
         if dists not in dists_hash:
             dists_hash[dists] = id(dists) # Hash data
+        #else:
+            #print('Duplicate')
         encoding[i] = dists_hash[dists]
 
     return dists_hash, encoding, proj_data[uq_indx]
