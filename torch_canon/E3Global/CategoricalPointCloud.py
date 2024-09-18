@@ -27,9 +27,11 @@ from abc import ABCMeta
 import numpy as np
 
 class CatFrame(metaclass=ABCMeta):
-    def __init__(self, tol=1e-4, *args, **kwargs):
+    def __init__(self, tol=1e-4, save=False, *args, **kwargs):
         super().__init__()
         self.tol = tol
+        self.save = save
+
         self.dist_hash = None
         self.g_hash = None
         self.dist_encoding = None
@@ -95,7 +97,8 @@ class CatFrame(metaclass=ABCMeta):
         sorted_graph = convert_partition(self.hopcroft, dist_hash, g_hash, dist_encoding, g_encoding)
         pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
         data, frame_R = align_pc_s3(cntr_data, us_data, pth)
-        self._save(data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding)
+        if self.save:
+            self._save(data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding)
         return data, frame_R, frame_t
 
     def traverse(self, sorted_graph, us_adj_dict, us_data, us_rank):
