@@ -34,9 +34,9 @@ def enc_us_pc(data, tol=1e-16, **kwargs):
 
     return dists_hash, encoding, proj_data[uq_indx]
 
-def enc_us_catpc(data, cat_data, tol=1e-16, **kwargs):
-    encoding = {}
-    dists_hash = {}
+def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, **kwargs):
+    encoding = {} if dist_encoding is None else dist_encoding
+    dists_hash = {} if dist_hash is None else dist_hash
 
     # Project and reduce locally close points (n^2 complexity)
     distances = data.norm(dim=1, keepdim=True)
@@ -56,9 +56,9 @@ def enc_us_catpc(data, cat_data, tol=1e-16, **kwargs):
 
 # Convex Hull (CH)
 #----------------------------
-def enc_ch_pc(us_data, edge_dict, us_rank, tol=1e-16):
-    encoding = {}
-    g_hash = {}
+def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-16):
+    encoding = {} if g_encoding is None else g_encoding
+    g_hash = {} if g_hash is None else g_hash
 
     # Encode edge information
     for point in edge_dict.keys():

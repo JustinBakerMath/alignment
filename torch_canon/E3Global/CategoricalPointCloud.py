@@ -25,12 +25,28 @@ from torch_canon.E3Global.qhull import get_ch_graph
 from abc import ABCMeta
 
 import numpy as np
-from scipy.spatial import ConvexHull
 
 class CatFrame(metaclass=ABCMeta):
     def __init__(self, tol=1e-4, *args, **kwargs):
         super().__init__()
         self.tol = tol
+        self.dist_hash = None
+        self.g_hash = None
+        self.dist_encoding = None
+        self.g_encoding = None
+        self.n_encoding = None
+
+    def _save(self, data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding):
+        self.data = data
+        self.frame_R = frame_R
+        self.frame_t = frame_t
+        self.sorted_graph = sorted_graph
+        self.dist_hash = dist_hash
+        self.g_hash = g_hash
+        self.dist_encoding = dist_encoding
+        self.g_encoding = g_encoding
+        self.n_encoding = n_encoding
+        pass
 
     def get_frame(self, data, cat_data, *args, **kwargs):
         data = check_type(data) # Assert Type
@@ -47,7 +63,9 @@ class CatFrame(metaclass=ABCMeta):
         # ROTATION GROUP
         # --------------
         # Unit Sphere Encoding
-        dist_hash, r_encoding, us_data = enc_us_catpc(data, cat_data, tol=self.tol)
+        dist_hash, dist_encoding, us_data = enc_us_catpc(
+                data, cat_data, 
+                dist_hash=self.dist_hash, dist_encoding=self.dist_encoding, tol=self.tol)
 
         # Build Convex Hull Graph
         us_rank = torch.linalg.matrix_rank(us_data, tol=self.tol)
@@ -60,21 +78,24 @@ class CatFrame(metaclass=ABCMeta):
         # Encode Convex Hull Geometry
         us_adj_dict = build_adjacency_list(ch_graph)
         dg = direct_graph(ch_graph)
-        g_hash, g_encoding = enc_ch_pc(us_data, us_adj_dict, us_rank, tol=self.tol)
+        g_hash, g_encoding = enc_ch_pc(
+                us_data, us_adj_dict, us_rank,
+                g_hash=self.g_hash, g_encoding=self.g_encoding, tol=self.tol)
 
         # COMBINE ENCODINGS
         n_encoding = {}
         # for each node combine ENCODINGS
         for i in range(us_n):
-            n_encoding[i] = (r_encoding[i], g_encoding[i])
+            n_encoding[i] = (dist_encoding[i], g_encoding[i])
 
         # CONSTRUCT DFA
         dfa = construct_dfa(n_encoding, dg)
         self.hopcroft = PartitionRefinement(dfa)
         self.hopcroft.refine(dfa)
-        sorted_graph = convert_partition(self.hopcroft, dist_hash, g_hash, r_encoding, g_encoding)
+        sorted_graph = convert_partition(self.hopcroft, dist_hash, g_hash, dist_encoding, g_encoding)
         pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
         data, frame_R = align_pc_s3(cntr_data, us_data, pth)
+        self._save(data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding)
         return data, frame_R, frame_t
 
     def traverse(self, sorted_graph, us_adj_dict, us_data, us_rank):
