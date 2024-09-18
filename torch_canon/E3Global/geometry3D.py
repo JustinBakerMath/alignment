@@ -7,6 +7,8 @@ def spherical_angles_between_vectors(vec0, vec1, vec2):
     angle = spherical_angle(vec0, vec1, vec2)
     if angle > np.pi:
         return 2*np.pi - angle
+    if np.isnan(angle):
+        return torch.tensor(0.0)
     return angle
 
 def check_colinear(vec1, vec2, tol):

@@ -83,9 +83,10 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
         # lexicographical shift
         angles = [custom_round(a.item(),tol) for a in angle]
         dists = [custom_round(d.item(),tol) for d in d_ij]
-        angles, idx = tuple(list_rotate(angles))
-        dists = dists[idx:] + dists[:idx]
+        #angles, idx = tuple(list_rotate(angles))
+        #dists = dists[idx:] + dists[:idx]
         lst = tuple(zip(angles,dists))
+        lst,_ = list_rotate(lst)
         if lst not in g_hash:
             g_hash[lst] = id(lst)
         encoding[point] = g_hash[lst]

@@ -59,7 +59,11 @@ def invert_hash(hash):
     return hash_inverted
 
 def list_rotate(lst):
-    idx = lst.index(min(lst))
+    if isinstance(lst[0], tuple):
+        min_ = min(lst, key=lambda x: (x[0], x[1]))
+    else:
+        min_ = min(lst)
+    idx = lst.index(min_)
     return lst[idx:] + lst[:idx], idx
 
 
