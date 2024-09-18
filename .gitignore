@@ -4,5 +4,6 @@
 
 **/torch_canon.egg-info/**
 
+**/build/**
 **/data/**
 **/out/**

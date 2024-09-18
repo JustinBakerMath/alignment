@@ -7,6 +7,7 @@ Includes:
     - Convex Hull (CH)
 
 '''
+#import ipdb
 import torch
 
 from torch_canon.utilities import custom_round, list_rotate
@@ -64,6 +65,7 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
 
     # Encode edge information
     for point in edge_dict.keys():
+        #ipdb.set_trace()
         # need to check clock-wise
         r_ij = us_data[edge_dict[point]]-us_data[point]
         projection = project_onto_plane(r_ij, us_data[point])
