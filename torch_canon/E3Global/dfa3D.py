@@ -55,19 +55,21 @@ def traversal(sorted_graph, us_adj_dict, us_data, us_rank):
 
     path.append(sorted_graph[symmetry_group][0][0])
     while False in visited_symmetry_groups and len(path) < us_data.shape[0]:
-        visited_symmetry_groups[symmetry_group] = True
-        source = sorted_graph[symmetry_group][0][0]
-        target = sorted_graph[symmetry_group][1][0]
-        #ipdb.set_trace()
-        for idx, (sources, targets) in enumerate(sorted_graph):
-            if target in sources and source in targets:
-                continue
-            elif target in sources and not visited_symmetry_groups[idx] and source not in targets:
-                symmetry_group = idx
-                path.append(target)
-                break
-            else:
-                if False in visited_symmetry_groups:
-                    symmetry_group = visited_symmetry_groups.index(False)
+
+        k = 0
+        while sorted_graph[symmetry_group][1][k] in path and k < len(sorted_graph[symmetry_group][1]) - 1:
+            k += 1
+        target = sorted_graph[symmetry_group][1][k]
+
+        if target in path:
+            visited_symmetry_groups[symmetry_group] = True
+            symmetry_group = (symmetry_group + 1)%len(sorted_graph)
+            continue
+        else:
+            path.append(target)
+            for idx, (sources, _) in enumerate(sorted_graph):
+                if target in sources and not visited_symmetry_groups[idx]:
+                    symmetry_group = idx
+                    break
 
     return path

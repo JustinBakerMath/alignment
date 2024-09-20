@@ -137,8 +137,8 @@ def angle_between_vectors(a, b, dim=-1):
     return 2 * torch.atan2(
             (a * b_norm - a_norm * b).norm(dim=dim),
             (a * b_norm + a_norm * b).norm(dim=dim))
-
 """
+
 def angle_between_vectors(v0, v1):
     v0_norm = v0 / (torch.linalg.norm(v0) + 1e-10)
     v1_norm = v1 / (torch.linalg.norm(v1) + 1e-10)

@@ -60,6 +60,7 @@ def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, 
 # Convex Hull (CH)
 #----------------------------
 def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-16):
+    #print('us_data',us_data.shape)
     encoding = {} if g_encoding is None else g_encoding
     g_hash = {} if g_hash is None else g_hash
 
@@ -72,10 +73,16 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
         projection = project_onto_plane(r_ij, us_data[point])
         ref_vec = projection.mean(dim=0)
         ref_vec = ref_vec/(ref_vec.norm()+1e-16)
+        if ref_vec.norm() < tol:
+            #print('ref_vec is zero')
+            ref_vec = us_data[~point].mean(dim=0)
         angles = [angle_between_vectors(projection[i], ref_vec).item() for i in range(len(edge_dict[point]))]
-        angles = [custom_round(a,tol) for a in angles]
-        tuples = [(angles[i],edge_dict[point][i]) for i in range(len(edge_dict[point]))]
-        rot_order = [point for _, point in sorted(tuples, key=lambda x: (x[0], x[1]), reverse=True)]
+        angles = [custom_round(a,tol).item() for a in angles]
+        d_ij = [angle_between_vectors(us_data[nbr], us_data[point]) for nbr in edge_dict[point]]
+        d_ij = [custom_round(d.item(),tol) for d in d_ij]
+        tuples = [(angles[i], d_ij[i], edge_dict[point][i]) for i in range(len(edge_dict[point]))]
+        tuples = sorted(tuples, key=lambda x: (x[0], x[1]), reverse=True)
+        rot_order = [point for _, _, point in tuples]
 
         edge_dict[point] = rot_order
         # angle encoding

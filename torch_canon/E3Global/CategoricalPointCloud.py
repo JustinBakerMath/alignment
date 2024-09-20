@@ -43,11 +43,15 @@ class CatFrame(metaclass=ABCMeta):
         self.frame_R = frame_R
         self.frame_t = frame_t
         self.sorted_graph = sorted_graph
-        self.dist_hash = dist_hash
-        self.g_hash = g_hash
-        self.dist_encoding = [dist_encoding[i] for i in sort_pth]
-        self.g_encoding = [g_encoding[i] for i in sort_pth]
-        self.n_encoding = [n_encoding[i] for i in sort_pth]
+
+        if self.save in ['dist', 'all']:
+            self.dist_hash = dist_hash
+            self.dist_encoding = [dist_encoding[i] for i in sort_pth]
+        if self.save in ['geom', 'all']:
+            self.g_hash = g_hash
+            self.g_encoding = [g_encoding[i] for i in sort_pth]
+        if self.save in ['node', 'all']:
+            self.n_encoding = [n_encoding[i] for i in sort_pth]
         self.sort_pth = sort_pth
         pass
 
@@ -99,7 +103,10 @@ class CatFrame(metaclass=ABCMeta):
         sort_pth = traversal(sorted_graph, us_adj_dict, us_data, us_rank)
         lindep_pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
         data, frame_R = align_pc_s3(cntr_data, us_data, lindep_pth)
-        if self.save:
+
+        if self.save is False:
+            return data, frame_R, frame_t
+        else:
             self._save(data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sort_pth)
         return data, frame_R, frame_t
 
