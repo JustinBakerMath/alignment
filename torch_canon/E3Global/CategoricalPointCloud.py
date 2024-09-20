@@ -38,7 +38,7 @@ class CatFrame(metaclass=ABCMeta):
         self.g_encoding = None
         self.n_encoding = None
 
-    def _save(self, data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sort_pth):
+    def _save(self, data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sort_pth, aligned_path):
         self.data = data
         self.frame_R = frame_R
         self.frame_t = frame_t
@@ -53,6 +53,7 @@ class CatFrame(metaclass=ABCMeta):
         if self.save in ['node', 'all']:
             self.n_encoding = [n_encoding[i] for i in sort_pth]
         self.sort_pth = sort_pth
+        self.aligned_path = aligned_path
         pass
 
     def get_frame(self, data, cat_data, *args, **kwargs):
@@ -100,14 +101,14 @@ class CatFrame(metaclass=ABCMeta):
         self.hopcroft = PartitionRefinement(dfa)
         self.hopcroft.refine(dfa)
         sorted_graph = convert_partition(self.hopcroft, dist_hash, g_hash, dist_encoding, g_encoding)
-        sort_pth = traversal(sorted_graph, us_adj_dict, us_data, us_rank)
+        sort_pth, aligned_path = traversal(sorted_graph, us_adj_dict, us_data, us_rank, indices)
         lindep_pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
         data, frame_R = align_pc_s3(cntr_data, us_data, lindep_pth)
 
         if self.save is False:
             return data, frame_R, frame_t
         else:
-            self._save(data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sort_pth)
+            self._save(data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sort_pth, aligned_path)
         return data, frame_R, frame_t
 
     def traverse(self, sorted_graph, us_adj_dict, us_data, us_rank):

@@ -48,7 +48,7 @@ def convert_partition(hopcroft, dist_hash, g_hash, r_encoding, g_encoding):
     return ret_graph
 
 
-def traversal(sorted_graph, us_adj_dict, us_data, us_rank):
+def traversal(sorted_graph, us_adj_dict, us_data, us_rank, indices):
     symmetry_group = 0
     path = []
     visited_symmetry_groups = [False for _ in range(len(sorted_graph))]
@@ -72,4 +72,13 @@ def traversal(sorted_graph, us_adj_dict, us_data, us_rank):
                     symmetry_group = idx
                     break
 
-    return path
+    
+    # need to align with the boolean mask of indices -- everytime the mask is false we need to bump the path index by 1
+    aligned_path = path.copy()
+    for index_idx, index_bool in enumerate(indices):
+        if not index_bool:
+            for path_idx, path_val in enumerate(aligned_path):
+                if path_val >= index_idx:
+                    aligned_path[path_idx] = path_val + 1
+
+    return path, aligned_path
