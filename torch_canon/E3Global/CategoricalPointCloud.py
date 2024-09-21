@@ -52,12 +52,21 @@ class CatFrame(metaclass=ABCMeta):
             self.g_encoding = [g_encoding[i] for i in sorted_path]
         if self.save in ['node', 'all']:
             self.n_encoding = [n_encoding[i] for i in sorted_path]
-        self.sorted_path = sorted_path
-        self.aligned_path = aligned_path
-        self.symmetric_elements = self.get_symmetric_elements(aligned_graph, local_list, local_mask)
-        flat_symmetric_elements = [item for sublist in self.symmetric_elements for item in sublist]
+        symmetric_elements = self.get_symmetric_elements(aligned_graph, local_list, local_mask)
+        flat_symmetric_elements = [item for sublist in symmetric_elements for item in sublist]
         assert len(flat_symmetric_elements) == data.shape[0], 'Symmetric elements do not match data size'
+        self.symmetric_elements = symmetric_elements.copy()
+        self.simple_asu = self.get_simple_asu(symmetric_elements, data)
         pass
+
+    def get_simple_asu(self, symmetric_elements, data):
+        asu = [symmetric_elements.pop()[0]]
+        while len(symmetric_elements) > 0:
+            elements = symmetric_elements.pop()
+            dists = np.linalg.norm(data[list(elements)] - data[asu[-1]])
+            argmin = np.argmin(dists)
+            asu.append(elements[argmin])
+        return asu
 
     def get_symmetric_elements(self, aligned_graph, local_list, local_mask):
         symmetric_elements = set(tuple(source) for source, _ in aligned_graph)

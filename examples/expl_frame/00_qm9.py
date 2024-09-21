@@ -78,6 +78,7 @@ for idx,data in enumerate(qm9[:args.n_data]):
         pg = 'C1'
     print(f'{smiles}: {pg}')
     print(f'Symmetric Elements: {frame.symmetric_elements}')
+    print(f'Simple ASU: {frame.simple_asu}')
 
     loss += compute_loss(pc_data, normalized_data)
 
