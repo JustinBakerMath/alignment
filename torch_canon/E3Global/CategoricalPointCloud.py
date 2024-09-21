@@ -56,16 +56,30 @@ class CatFrame(metaclass=ABCMeta):
         flat_symmetric_elements = [item for sublist in symmetric_elements for item in sublist]
         assert len(flat_symmetric_elements) == data.shape[0], 'Symmetric elements do not match data size'
         self.symmetric_elements = symmetric_elements.copy()
-        self.simple_asu = self.get_simple_asu(symmetric_elements, data)
+        self.simple_asu = self.get_simple_asu(symmetric_elements,  data)
         pass
 
-    def get_simple_asu(self, symmetric_elements, data):
-        asu = [symmetric_elements.pop()[0]]
-        while len(symmetric_elements) > 0:
-            elements = symmetric_elements.pop()
-            dists = np.linalg.norm(data[list(elements)] - data[asu[-1]])
+    def get_simple_asu(self, symmetric_elements, data, asu=None):
+        fresh_asu = False if asu is not None else True
+        repeat_elements = set()
+        while len(symmetric_elements) > 0 and () not in symmetric_elements:
+            elements = list(symmetric_elements.pop())
+            if not fresh_asu and len(asu) == np.linalg.matrix_rank(data):
+                return asu
+            elif asu is None:
+                asu = [elements[0]]
+                elements = np.delete(elements, 0, axis=0)
+                if len(elements)>0:
+                    repeat_elements.add(tuple(elements))
+                continue
+            dists = np.linalg.norm(data[elements] - data[asu[-1]])
             argmin = np.argmin(dists)
             asu.append(elements[argmin])
+            elements = tuple(np.delete(elements, argmin, axis=0))
+            if len(elements)>0:
+                repeat_elements.add(tuple(elements))
+        if len(asu)<=np.linalg.matrix_rank(data):
+            return self.get_simple_asu(repeat_elements, data, asu=asu)
         return asu
 
     def get_symmetric_elements(self, aligned_graph, local_list, local_mask):
