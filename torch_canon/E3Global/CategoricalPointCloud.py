@@ -38,7 +38,7 @@ class CatFrame(metaclass=ABCMeta):
         self.g_encoding = None
         self.n_encoding = None
 
-    def _save(self, data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sort_pth, aligned_path):
+    def _save(self, data, frame_R, frame_t, sorted_graph, aligned_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sorted_path, aligned_path, local_list, local_mask):
         self.data = data
         self.frame_R = frame_R
         self.frame_t = frame_t
@@ -46,15 +46,50 @@ class CatFrame(metaclass=ABCMeta):
 
         if self.save in ['dist', 'all']:
             self.dist_hash = dist_hash
-            self.dist_encoding = [dist_encoding[i] for i in sort_pth]
+            self.dist_encoding = [dist_encoding[i] for i in sorted_path]
         if self.save in ['geom', 'all']:
             self.g_hash = g_hash
-            self.g_encoding = [g_encoding[i] for i in sort_pth]
+            self.g_encoding = [g_encoding[i] for i in sorted_path]
         if self.save in ['node', 'all']:
-            self.n_encoding = [n_encoding[i] for i in sort_pth]
-        self.sort_pth = sort_pth
+            self.n_encoding = [n_encoding[i] for i in sorted_path]
+        self.sorted_path = sorted_path
         self.aligned_path = aligned_path
+        self.symmetric_elements = self.get_symmetric_elements(aligned_graph, local_list, local_mask)
+        flat_symmetric_elements = [item for sublist in self.symmetric_elements for item in sublist]
+        assert len(flat_symmetric_elements) == data.shape[0], 'Symmetric elements do not match data size'
         pass
+
+    def get_symmetric_elements(self, aligned_graph, local_list, local_mask):
+        symmetric_elements = set(tuple(source) for source, _ in aligned_graph)
+        symmetric_elements.update(set(tuple(target) for _, target in aligned_graph))
+        # bump all values by 1 after local_mask false occurs
+        if len(local_list) > 0:
+            for index_idx, index_bool in enumerate(local_mask):
+                if not index_bool:
+                    new_symmetric_elements = set()
+                    for idx, sublist in enumerate(symmetric_elements):
+                        new_symmetric_elements.add(tuple([item + 1 if item >= index_idx else item for item in sublist]))
+
+                    symmetric_elements = new_symmetric_elements
+
+            mapping_dict = {}
+            for idx, sublist in enumerate(symmetric_elements):
+                for item in sublist:
+                    mapping_dict[item] = idx
+            result = [[] for _ in symmetric_elements]
+            for sublist in local_list:
+                base_element = sublist[0]  # Identify which sublist this belongs to
+                mapped_index = mapping_dict.get(base_element)
+
+                if mapped_index is not None:
+                    result[mapped_index].extend(sublist[1:])  # Add elements to the correct result sublist
+
+            for result_sublist in result:
+                if len(result_sublist) > 0:
+                    symmetric_elements.add(tuple(result_sublist))
+        return symmetric_elements
+
+
 
     def get_frame(self, data, cat_data, *args, **kwargs):
         data = check_type(data) # Assert Type
@@ -64,15 +99,15 @@ class CatFrame(metaclass=ABCMeta):
         data, frame_t = align_pc_t(data) # Translation group alignment
         cntr_data = data.clone() # TODO: Don't copy just use indexing
         dists = torch.linalg.norm(data, axis=1)
-        indices = dists > self.tol
-        data, cat_data = data[indices], cat_data[indices]
+        zero_mask = dists > self.tol
+        data, cat_data = data[zero_mask], cat_data[zero_mask]
         dists = torch.linalg.norm(data, axis=1)
 
         # ROTATION GROUP
         # --------------
         # Unit Sphere Encoding
-        dist_hash, dist_encoding, us_data = enc_us_catpc(
-                data, cat_data, 
+        dist_hash, dist_encoding, us_data, local_list, local_mask = enc_us_catpc(
+                data, cat_data,
                 dist_hash=self.dist_hash, dist_encoding=None, tol=self.tol)
 
         # Build Convex Hull Graph
@@ -100,15 +135,15 @@ class CatFrame(metaclass=ABCMeta):
         dfa = construct_dfa(n_encoding, dg)
         self.hopcroft = PartitionRefinement(dfa)
         self.hopcroft.refine(dfa)
-        sorted_graph = convert_partition(self.hopcroft, dist_hash, g_hash, dist_encoding, g_encoding)
-        sort_pth, aligned_path = traversal(sorted_graph, us_adj_dict, us_data, us_rank, indices)
+        sorted_graph, aligned_graph = convert_partition(self.hopcroft, dist_hash, g_hash, dist_encoding, g_encoding, zero_mask)
+        sorted_path, aligned_path = traversal(sorted_graph, us_adj_dict, us_data, us_rank, zero_mask)
         lindep_pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
         data, frame_R = align_pc_s3(cntr_data, us_data, lindep_pth)
 
         if self.save is False:
             return data, frame_R, frame_t
         else:
-            self._save(data, frame_R, frame_t, sorted_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sort_pth, aligned_path)
+            self._save(data, frame_R, frame_t, sorted_graph, aligned_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sorted_path, aligned_path, local_list, local_mask)
         return data, frame_R, frame_t
 
     def traverse(self, sorted_graph, us_adj_dict, us_data, us_rank):

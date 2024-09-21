@@ -9,7 +9,7 @@ def construct_dfa(encoding, graph):
         dfa_set.append(value)
     return dfa_set
 
-def convert_partition(hopcroft, dist_hash, g_hash, r_encoding, g_encoding):
+def convert_partition(hopcroft, dist_hash, g_hash, r_encoding, g_encoding, zero_mask):
     hashed_edges = list(tuple(ast.literal_eval(k)) for k in hopcroft._partition.keys())
     ret_edges = []
     ret_graph = []
@@ -45,10 +45,25 @@ def convert_partition(hopcroft, dist_hash, g_hash, r_encoding, g_encoding):
     indexed_edges = sorted(enumerate(ret_edges), key=lambda x: x[1])
     sorted_inidces = [i for i,_ in indexed_edges]
     ret_graph = [ret_graph[i] for i in sorted_inidces]
-    return ret_graph
+
+    aligned_graph = ret_graph.copy()
+    zero_elems = []
+    for index_idx, index_bool in enumerate(zero_mask):
+        if not index_bool:
+            zero_elems.append(index_idx)
+            for sym_idx, symmetry_group in enumerate(aligned_graph):
+                sources, targets = symmetry_group
+                sources = [source + 1 if source >= index_idx else source for source in sources]
+                targets = [target + 1 if target >= index_idx else target for target in targets]
+                aligned_graph[sym_idx] = [sources, targets]
+
+    if len(zero_elems) > 0:
+        aligned_graph.append([zero_elems, zero_elems])
+
+    return ret_graph, aligned_graph
 
 
-def traversal(sorted_graph, us_adj_dict, us_data, us_rank, indices):
+def traversal(sorted_graph, us_adj_dict, us_data, us_rank, zero_mask):
     symmetry_group = 0
     path = []
     visited_symmetry_groups = [False for _ in range(len(sorted_graph))]
@@ -73,9 +88,9 @@ def traversal(sorted_graph, us_adj_dict, us_data, us_rank, indices):
                     break
 
     
-    # need to align with the boolean mask of indices -- everytime the mask is false we need to bump the path index by 1
+    # need to align with the boolean mask of zero_mask -- everytime the mask is false we need to bump the path index by 1
     aligned_path = path.copy()
-    for index_idx, index_bool in enumerate(indices):
+    for index_idx, index_bool in enumerate(zero_mask):
         if not index_bool:
             for path_idx, path_val in enumerate(aligned_path):
                 if path_val >= index_idx:

@@ -45,22 +45,27 @@ def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, 
     locally_close_idx_arrs, uq_indx = reduce_us(proj_data, data, tol=tol)
 
     # Encode information while pooling locally close points
+    sorted_local_mask = []
     for i,idx_arr in enumerate(locally_close_idx_arrs):
         proj_data[uq_indx[i]] = proj_data[idx_arr].mean(dim=0)
         dists = [(custom_round(distances[idx].item(),tol), custom_round(cat_data[idx].item(),tol))  for idx in idx_arr] # Collect local info
-        dists = tuple(sorted(dists)) # Sort data
+        sorting_index = sorted(range(len(dists)), key=lambda k: dists[k])
+        dists = tuple([ dists[k] for k in sorting_index]) # sort distances
+        if len(sorting_index) > 1:
+            sorted_local_mask.append([idx_arr[k] for k in sorting_index])
         if dists not in dists_hash:
             dists_hash[dists] = len(dists_hash)#id(dists) # Hash data
-        #else:
-            #print('Duplicate')
         encoding[i] = dists_hash[dists]
 
-    return dists_hash, encoding, proj_data[uq_indx]
+    local_mask = [True for _ in range(data.shape[0])]
+    for sublist in sorted_local_mask:
+        for idx in sublist[1:]:
+            local_mask[idx] = False
+    return dists_hash, encoding, proj_data[uq_indx], sorted_local_mask, local_mask
 
 # Convex Hull (CH)
 #----------------------------
 def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-16):
-    #print('us_data',us_data.shape)
     encoding = {} if g_encoding is None else g_encoding
     g_hash = {} if g_hash is None else g_hash
 

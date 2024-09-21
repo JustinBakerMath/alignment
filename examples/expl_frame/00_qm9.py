@@ -67,7 +67,17 @@ for idx,data in enumerate(qm9[:args.n_data]):
     cat_data = data.z.numpy()
     normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
 
-    smiles = ''.join([atomic_number_to_symbol[cat] for cat in cat_data])
+    try:
+        smiles = data.smiles
+    except:
+        smiles = ''.join([atomic_number_to_symbol[cat] for cat in cat_data])
+    symbols = [atomic_number_to_symbol[cat] for cat in cat_data]
+    try:
+        pg = PointGroup(normalized_data, symbols).get_point_group()
+    except:
+        pg = 'C1'
+    print(f'{smiles}: {pg}')
+    print(f'Symmetric Elements: {frame.symmetric_elements}')
 
     loss += compute_loss(pc_data, normalized_data)
 
