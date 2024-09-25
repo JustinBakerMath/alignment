@@ -8,6 +8,8 @@ Includes:
 
 '''
 #import ipdb
+import numpy as np
+
 import torch
 
 from torch_canon.utilities import custom_round, list_rotate
@@ -42,7 +44,14 @@ def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, 
     # Project and reduce locally close points (n^2 complexity)
     distances = data.norm(dim=1, keepdim=True)
     proj_data =  data/distances
-    locally_close_idx_arrs, uq_indx = reduce_us(proj_data, data, tol=tol)
+    rank = torch.linalg.matrix_rank(data, rtol=tol, atol=tol)
+
+    if rank==2:
+        test_points = reduce_rank2(proj_data, tol=tol)
+    else:
+        test_points = proj_data
+
+    locally_close_idx_arrs, uq_indx = reduce_us(test_points, data, tol=tol)
 
     # Encode information while pooling locally close points
     sorted_local_mask = []
@@ -112,6 +121,7 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
 # Reduction Tools
 #----------------
 def reduce_us(us_data, data, tol=1e-16):
+    tol = np.sqrt(tol)
     similar_indices = []
     uq_indices = []
     I = [i for i in range(us_data.shape[0])]
@@ -124,11 +134,24 @@ def reduce_us(us_data, data, tol=1e-16):
             j=J[0]
             dotij = torch.dot(us_data[i], us_data[j]).clamp(-1,1)
             is_close  = torch.arccos(dotij) < tol
-            if is_close:
+            is_close2 = torch.norm(us_data[i]-us_data[j]) < tol
+            if is_close2:
                 colinear = check_colinear(data[i], data[j], tol)
-                if colinear:
+                if colinear or is_close:
                     similar_indices[-1].append(j)
                     I.remove(j)
             J.remove(j)
         I.remove(i)
     return similar_indices, uq_indices
+
+
+def reduce_rank2(points, tol=1e-16):
+    points = points.numpy()
+    mean_point = np.mean(points, axis=0)
+    _, _, Vt = np.linalg.svd(points - mean_point)
+    normal = Vt[-1]
+    basis_x = Vt[0]
+    basis_y = np.cross(normal, basis_x)
+    basis_z = np.zeros(3)
+    points_3d = np.dot(points - mean_point, np.array([basis_x, basis_y, basis_z]).T)
+    return torch.from_numpy(points_3d)
