@@ -12,6 +12,7 @@ import argparse
 import sys
 import logging
 
+from mpi4py import MPI
 from time import time
 
 import numpy as np
@@ -32,7 +33,7 @@ from E3Global.CategoricalPointCloud import CatFrame as Frame
 # -----
 parser = argparse.ArgumentParser()
 parser.add_argument('--name', type=str, default='benzene', help='Dataset name')
-parser.add_argument('--n_data', type=int, default=100, help='Number of data points to process')
+parser.add_argument('--n_data', type=int, default=100, help='Random seed')
 parser.add_argument('--frq_log', type=int, default=10, help='Random seed')
 args = parser.parse_args()
 
@@ -40,13 +41,10 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 start_time = time()
 
 md17 = MD17(root='./data/md17/',name=args.name)
-frame = Frame(tol=1e-2, save='all')
 
 atomic_number_to_symbol = {
     1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'
     }
-pg_losses = {}
-pg_counts = {}
 loss = 0
 recon_loss = 0
 
@@ -57,51 +55,57 @@ def compute_loss(data, data_transformed):
     return loss
 
 
-np.random.seed(42)
+# MPI Setup
+# ---------
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+
+n_data = len(md17[:args.n_data])
+n_g_actions = 5
+chunk_size = n_data // size
+start_idx = rank * chunk_size
+end_idx = (rank + 1) * chunk_size if rank != size - 1 else n_data
+
+if rank == 0:
+    seed = 42
+else:
+    seed = None
+seed = comm.bcast(seed, root=0)
+np.random.seed(seed + rank)
 
 
 # Main Loop
 # ---------
-for idx,data in enumerate(md17[:args.n_data]):
+for idx,data in enumerate(md17[start_idx:end_idx]):
 
-    logging.info(f"Completed {idx+1}/{args.n_data} iterations.")
+    frame = Frame(tol=0.5, save='all')
+
+    if rank==0 and (idx+1) % args.frq_log == 0:  
+        logging.info(f"Process {rank}: Completed {idx+1}/{chunk_size} iterations.")
 
     pc_data = data.pos
     cat_data = data.z.numpy()
-    normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
 
-    try:
-        smiles = data.smiles
-    except:
-        smiles = ''.join([atomic_number_to_symbol[cat] for cat in cat_data])
-    symbols = [atomic_number_to_symbol[cat] for cat in cat_data]
-    try:
-        pg = PointGroup(normalized_data, symbols).get_point_group()
-    except:
-        pg = 'C1'
-    print(f'{smiles}: {pg}')
-    print(f'Symmetric Elements: {frame.symmetric_elements}')
-    print(f'Simple ASU: {frame.simple_asu}')
+    data_rank = torch.linalg.matrix_rank(pc_data)
+    normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
+    print(frame.symmetric_elements)
 
     loss += compute_loss(pc_data, normalized_data)
-    if pg not in pg_losses:
-        pg_losses[pg] = loss
-        pg_counts[pg] = 1
-    else:
-        pg_losses[pg] += loss
-        pg_counts[pg] += 1
 
-    #inv_R = torch.tensor(R.from_matrix(frame_R).inv().as_matrix(), dtype=torch.float32)
     inv_R = torch.linalg.inv(frame_R)
     recon_data = (inv_R @ normalized_data.T).T + frame_t
-    r_loss = compute_loss(pc_data, recon_data)
-    if r_loss > 1e-4:
-        logging.info(f'Loss {smiles}: {r_loss:.4f}')
-        break
-    recon_loss += r_loss
+    recon_loss = compute_loss(pc_data, recon_data)
 
-logging.info(f'Average move {loss/args.n_data:.4f}')
-logging.info(f'Reconstruction loss {recon_loss/args.n_data:.4f}')
-logging.info(f'PG Losses: {pg_counts}')
-logging.info(f'Time: {time()-start_time:.4f}')
-logging.info('Done!')
+loss_total = comm.reduce(loss, op=MPI.SUM, root=0)
+recon_loss_total = comm.reduce(recon_loss, op=MPI.SUM, root=0)
+
+# MPI Finalize
+comm.Barrier()
+MPI.Finalize()
+
+if rank == 0:
+    logging.info(f'Average move {loss_total/n_data:.4f}')
+    logging.info(f'Reconstruction loss {recon_loss_total/n_data:.4f}')
+    logging.info(f'Time: {time()-start_time:.4f}')
+    logging.info('Done!')

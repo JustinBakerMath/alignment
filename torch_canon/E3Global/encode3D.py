@@ -8,6 +8,7 @@ Includes:
 
 '''
 #import ipdb
+import math
 import numpy as np
 
 import torch
@@ -91,7 +92,7 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
             #print('ref_vec is zero')
             ref_vec = us_data[~point].mean(dim=0)
         angles = [angle_between_vectors(projection[i], ref_vec).item() for i in range(len(edge_dict[point]))]
-        angles = [custom_round(a,tol).item() for a in angles]
+        angles = [custom_round(a,0.03).item() for a in angles]
         d_ij = [angle_between_vectors(us_data[nbr], us_data[point]) for nbr in edge_dict[point]]
         d_ij = [custom_round(d.item(),tol) for d in d_ij]
         tuples = [(angles[i], d_ij[i], edge_dict[point][i]) for i in range(len(edge_dict[point]))]
@@ -106,7 +107,7 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
 
         d_ij = [angle_between_vectors(us_data[nbr], us_data[point]) for nbr in edge_dict[point]]
         # lexicographical shift
-        angles = [custom_round(a.item(),tol) for a in angle]
+        angles = [custom_round(a.item(),0.03) for a in angle]
         dists = [custom_round(d.item(),tol) for d in d_ij]
         #angles, idx = tuple(list_rotate(angles))
         #dists = dists[idx:] + dists[:idx]
@@ -121,7 +122,6 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
 # Reduction Tools
 #----------------
 def reduce_us(us_data, data, tol=1e-16):
-    tol = np.sqrt(tol)
     similar_indices = []
     uq_indices = []
     I = [i for i in range(us_data.shape[0])]
@@ -136,7 +136,7 @@ def reduce_us(us_data, data, tol=1e-16):
             is_close  = torch.arccos(dotij) < tol
             is_close2 = torch.norm(us_data[i]-us_data[j]) < tol
             if is_close2:
-                colinear = check_colinear(data[i], data[j], tol)
+                colinear = check_colinear(data[i], data[j], 0.03)
                 if colinear or is_close:
                     similar_indices[-1].append(j)
                     I.remove(j)
