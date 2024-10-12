@@ -17,7 +17,7 @@ from torch_canon.Hopcroft import PartitionRefinement
 from torch_canon.utilities import build_adjacency_list, check_type, direct_graph
 
 from torch_canon.E3Global.align3D import align_pc_t, align_pc_s3
-from torch_canon.E3Global.dfa3D import construct_dfa, convert_partition, traversal
+from torch_canon.E3Global.dfa3D import construct_dfa, convert_partition, traversal, construct_symmetries
 from torch_canon.E3Global.encode3D import enc_us_catpc, enc_ch_pc
 from torch_canon.E3Global.geometry3D import check_colinear
 from torch_canon.E3Global.qhull import get_ch_graph
@@ -38,8 +38,9 @@ class CatFrame(metaclass=ABCMeta):
         self.g_encoding = None
         self.n_encoding = None
 
-    def _save(self, data, frame_R, frame_t, sorted_graph, aligned_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sorted_path, aligned_path, local_list, local_mask):
+    def _save(self, pre_data, data, frame_R, frame_t, sorted_graph, aligned_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sorted_path, aligned_path, local_list, local_mask):
         self.data = data
+        self.pre_data = pre_data
         self.frame_R = frame_R
         self.frame_t = frame_t
         self.sorted_graph = sorted_graph
@@ -57,6 +58,7 @@ class CatFrame(metaclass=ABCMeta):
         assert len(flat_symmetric_elements) == data.shape[0], 'Symmetric elements do not match data size'
         self.symmetric_elements = symmetric_elements.copy()
         self.simple_asu = self.get_simple_asu(symmetric_elements,  data)
+        self.symmetries = construct_symmetries(pre_data, self.symmetric_elements.copy(), self.tol)
         pass
 
     def get_simple_asu(self, symmetric_elements, data, asu=None):
@@ -122,6 +124,7 @@ class CatFrame(metaclass=ABCMeta):
         data, frame_t = align_pc_t(data) # Translation group alignment
         cntr_data = data.clone() # TODO: Don't copy just use indexing
         dists = torch.linalg.norm(data, axis=1)
+        angle_tol = max(np.arcsin(self.tol/(dists.min().item()+self.tol)), np.sqrt(self.tol))
         zero_mask = dists > self.tol
         data, cat_data = data[zero_mask], cat_data[zero_mask]
         dists = torch.linalg.norm(data, axis=1)
@@ -131,7 +134,8 @@ class CatFrame(metaclass=ABCMeta):
         # Unit Sphere Encoding
         dist_hash, dist_encoding, us_data, local_list, local_mask = enc_us_catpc(
                 data, cat_data,
-                dist_hash=self.dist_hash, dist_encoding=None, tol=self.tol)
+                dist_hash=self.dist_hash, dist_encoding=None,
+                tol=self.tol, angle_tol=angle_tol)
 
         # Build Convex Hull Graph
         us_rank = torch.linalg.matrix_rank(us_data, tol=self.tol)
@@ -146,7 +150,8 @@ class CatFrame(metaclass=ABCMeta):
         dg = direct_graph(ch_graph)
         g_hash, g_encoding = enc_ch_pc(
                 us_data, us_adj_dict, us_rank,
-                g_hash=self.g_hash, g_encoding=None, tol=self.tol)
+                g_hash=self.g_hash, g_encoding=None,
+                tol=self.tol, angle_tol=angle_tol)
 
         # COMBINE ENCODINGS
         n_encoding = {}
@@ -161,12 +166,13 @@ class CatFrame(metaclass=ABCMeta):
         sorted_graph, aligned_graph = convert_partition(self.hopcroft, dist_hash, g_hash, dist_encoding, g_encoding, zero_mask)
         sorted_path, aligned_path = traversal(sorted_graph, us_adj_dict, us_data, us_rank, zero_mask)
         lindep_pth = self.traverse(sorted_graph, us_adj_dict, us_data, us_rank)
+        pre_data = data.clone()
         data, frame_R = align_pc_s3(cntr_data, us_data, lindep_pth)
 
         if self.save is False:
             return data, frame_R, frame_t
         else:
-            self._save(data, frame_R, frame_t, sorted_graph, aligned_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sorted_path, aligned_path, local_list, local_mask)
+            self._save(pre_data, data, frame_R, frame_t, sorted_graph, aligned_graph, dist_hash, g_hash, dist_encoding, g_encoding, n_encoding, sorted_path, aligned_path, local_list, local_mask)
         return data, frame_R, frame_t
 
     def traverse(self, sorted_graph, us_adj_dict, us_data, us_rank):

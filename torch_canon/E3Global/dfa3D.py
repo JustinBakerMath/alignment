@@ -1,6 +1,10 @@
 import ast
+import torch
+import numpy as np
 from torch_canon.utilities import get_key
+from torch_canon.E3Global.geometry3D import check_colinear
 import ipdb
+from scipy.spatial.transform import Rotation
 
 def construct_dfa(encoding, graph):
     dfa_set = list()
@@ -97,3 +101,131 @@ def traversal(sorted_graph, us_adj_dict, us_data, us_rank, zero_mask):
                     aligned_path[path_idx] = path_val + 1
 
     return path, aligned_path
+
+
+
+def construct_symmetries(data, symmetric_elements, tol):
+    rank = np.linalg.matrix_rank(data,tol=tol)
+    #print('RANK:', rank)
+    idx_near_zero = list(np.where(np.linalg.norm(data, axis=1) <tol)[0])
+    symmetric_elements = [sym for sym in symmetric_elements if not set(idx_near_zero).intersection(set(sym))]
+
+    set_lengths = [len(sym) for sym in symmetric_elements]
+    min_set_length = min(set_lengths)
+    max_set_length = max(set_lengths)
+    I = np.eye(data.shape[1])
+
+    # if the count of set lenghts ==1 is larger than the rank then C1
+    sigma = True
+    if rank == 1: #(C1, Cinfv, Dinfh) (E, i)
+        if sum([x==1 for x in set_lengths]) >  3:
+            #print('DETECTED C1')
+            return [I] # C1, (E)
+        elif min_set_length == 1:
+            #print('DETECTED Cinfv')
+            return [I] # Cinfv, (E)
+        else:
+            #print('DETECTED Dinfh')
+            R = np.eye(data.shape[1])
+            R[2][2] = -1
+            #assert np.linalg.norm(data+data@R.T) < tol
+            return [I, R] # Dinfh, (E, i)
+    elif rank == 2:
+        if len(symmetric_elements) == 1:
+            ##print('DETECTED C2')
+            # get R as the 
+            r = len(symmetric_elements[0])
+            i=1
+            while np.cross(data[0], data[i]).sum() < tol:
+                i += 1
+            n = np.cross(data[0], data[i])
+            n = n/np.linalg.norm(n)
+            Rs = []
+            for idx in range(r):
+                # Construct rotation matrix
+                R = Rotation.from_rotvec((2*np.pi)*(idx+1)/r * n).as_matrix()
+                Rs.append(R)
+            Ps = []
+            if r%2==0:
+                # get the edge-edge and node-node reflections
+                for i in range(0,r-2): # I think we are missing one reflection
+                    v = data[i]
+                    v = v/np.linalg.norm(v)
+                    n = np.cross(n, v)
+                    P = np.eye(data.shape[1]) - 2*np.outer(n, n)
+                    diff = data + data@P.T
+                    projection = np.dot(diff, n)
+                    #assert np.linalg.norm(projection) < tol
+                    Ps.append(P)
+                    v = (data[i] + data[i+1])/2
+                    if np.linalg.norm(v) > tol:
+                        v = v/np.linalg.norm(v)
+                        n = np.cross(n, v)
+                        P = np.eye(data.shape[1]) - 2*np.outer(n, n)
+                        diff = data + data@P.T
+                        projection = np.dot(diff, n)
+                        #assert np.linalg.norm(projection) < tol
+            else:
+                # get the edge-face reflections
+                pass
+            return [I] + Rs + Ps
+
+        elif sum([x==1 for x in set_lengths]) >  3:
+            #print('DETECTED C1')
+            return [np.eye(data.shape[1])]
+        elif min_set_length==max_set_length:
+            #print('DETECTED C2h')
+            n = np.cross(data[0], data[1])
+            elems = [sym[0] for sym in symmetric_elements]
+            #print(symmetric_elements)
+            Rs = []
+            for v in data[elems]:
+                n = n/np.linalg.norm(n)
+                v = v/np.linalg.norm(v)
+                n = np.cross(n, v)
+                R = np.eye(data.shape[1]) - 2*np.outer(n, n)
+                diff = data + data@R.T
+                projection = np.dot(diff, n)
+                #print(projection)
+                #assert np.linalg.norm(projection) < tol
+                Rs.append(R)
+            return [I] + Rs
+        elif min_set_length == 1:
+            test_set = [sym[0] for sym in symmetric_elements if len(sym) == 1]
+            # check if they are all colinear
+            test = test_set[0]
+            for idx in range(1,len(test_set)):
+                test_data = torch.tensor(data[test])
+                test_data_set = torch.tensor(data[test_set[idx]])
+                if not check_colinear(test_data, test_data_set, tol):
+                    sigma = False
+                    break
+            if sigma and len(test_set) > 1:
+                #print('DETECTED C2h')
+                n = np.cross(data[0], data[1])
+                Rs = []
+                for v in data[test_set]:
+                    n = n/np.linalg.norm(n)
+                    v = v/np.linalg.norm(v)
+                    n = np.cross(n, v)
+                    R = np.eye(data.shape[1]) - 2*np.outer(n, n)
+                    diff = data + data@R.T
+                    projection = np.dot(diff, n)
+                    #assert np.linalg.norm(projection) < tol
+                    Rs.append(R)
+                return [I] + Rs
+            else:
+                #print('DETECTED C2v')
+                n = np.cross(data[0], data[1])
+                v = data[test]
+                n = n/np.linalg.norm(n)
+                v = v/np.linalg.norm(v)
+                n = np.cross(n, v)
+                R = np.eye(data.shape[1]) - 2*np.outer(n, n)
+                diff = data + data@R.T
+                projection = np.dot(diff, n)
+                #assert np.linalg.norm(projection) < tol
+                return [np.eye(data.shape[1]), R]
+
+
+    return [np.eye(data.shape[1])]
