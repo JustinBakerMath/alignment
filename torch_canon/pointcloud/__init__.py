@@ -16,19 +16,24 @@ import numpy as np
 from torch_canon.Hopcroft import PartitionRefinement
 from torch_canon.utilities import build_adjacency_list, check_type, direct_graph
 
-from torch_canon.E3Global.align3D import align_pc_t, align_pc_s3
-from torch_canon.E3Global.dfa3D import construct_dfa, convert_partition, traversal, construct_symmetries
-from torch_canon.E3Global.encode3D import enc_us_catpc, enc_ch_pc
-from torch_canon.E3Global.geometry3D import check_colinear
-from torch_canon.E3Global.qhull import get_ch_graph
+from .align import align_pc_t, align_pc_s3
+from .dfa import construct_dfa, convert_partition, traversal, construct_symmetries
+from .canon import enc_us_catpc, enc_ch_pc
+from .complete import check_colinear
+from .qhull import get_ch_graph
 
 from abc import ABCMeta
 
 import numpy as np
 
-class CatFrame(metaclass=ABCMeta):
-    def __init__(self, tol=1e-4, save=False, *args, **kwargs):
+class CanonEn(metaclass=ABCMeta):
+    def __init__(self,
+                 n : int = 3,
+                 tol : float = 1e-4,
+                 save : str = '',
+     ) -> None:
         super().__init__()
+        self.n = n
         self.tol = tol
         self.save = save
 

@@ -25,8 +25,7 @@ from torch_geometric.loader import DataLoader
 
 from pointgroup import PointGroup
 
-sys.path.append('./torch_canon/')
-from E3Global.CategoricalPointCloud import CatFrame as Frame
+from torch_canon.pointcloud import CanonEn as Canon
 
 
 # Setup
@@ -79,7 +78,7 @@ np.random.seed(seed + rank)
 # ---------
 for idx,data in enumerate(md17[start_idx:end_idx]):
 
-    frame = Frame(tol=0.2, save='all')
+    frame = Canon(tol=0.2, save='all')
 
     if rank==0 and (idx+1) % args.frq_log == 0:  
         logging.info(f"Process {rank}: Completed {idx+1}/{chunk_size} iterations.")

@@ -2,8 +2,7 @@ import ast
 import torch
 import numpy as np
 from torch_canon.utilities import get_key
-from torch_canon.E3Global.geometry3D import check_colinear
-import ipdb
+from .complete import check_colinear
 from scipy.spatial.transform import Rotation
 
 def construct_dfa(encoding, graph):

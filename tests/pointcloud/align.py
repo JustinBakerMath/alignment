@@ -1,5 +1,5 @@
 '''
-PyTest for torch_canon/E3Global/qhull.py
+PyTest for torch_canon/canon/align.py
 ==========================================
 
 '''
@@ -8,15 +8,20 @@ import pytest
 import torch
 import math
 
-from torch_canon.E3Global.qhull import get_ch_graph_2d
+from torch_canon.pointcloud.align import (align_pc_t,
+                                          align_pc_s3,
+                                          cartesian2spherical_xtheta,
+                                          cartesian2spherical_ytheta,
+                                          cartesian2spherical_ztheta,
+                                          xy_planar_alignment,
+                                          xz_planar_alignment,
+                                          zy_planar_alignment,
+                                          z_axis_alignment,
+                                          )
+
 
 # Predefined Objects
 #-------------------
-tetrahedron = [[1.0, 1.0, 1.0],
-               [-1.0, -1.0, 1.0],
-               [-1.0, 1.0, -1.0],
-               [1.0, -1.0, -1.0]]
-
 unit_cube = [[1.0, 0.0, 0.0],
              [0.0, 1.0, 0.0],
              [0.0, 0.0, 1.0],
@@ -143,28 +148,3 @@ def test_planar_align(direction, pos, tol):
 @pytest.mark.parametrize('pos', unit_cube)
 def test_zaxis_align(pos, tol):
     unittest_z_axis_alignment(pos, tol)
-
-
-if __name__=='__main__':
-    '''
-    tet = torch.tensor(tetrahedron, dtype=torch.float32)
-    print(tet)
-    unit_tet = tet/tet.norm(dim=0)
-    edges = get_ch_graph_2d(unit_tet, 3, unit_tet.shape[0])
-    print(edges)
-    '''
-
-    import sys
-    from tqdm import tqdm
-
-    sys.path.append('./datasets/')
-    from modelnet40 import ModelNet40Dataset
-
-    print('Loading ModelNet40 Dataset')
-    train_ds = ModelNet40Dataset(root='./data/modelnet')
-    print(train_ds)
-
-    for i in tqdm(range(1)):
-        print(train_ds[i].pos)
-        pos = torch.tensor(train_ds[i].pos, dtype=torch.float32)
-        get_ch_graph_2d(pos, 3, pos.shape[0])

@@ -22,7 +22,7 @@ from torch_geometric.loader import DataLoader
 
 from pointgroup import PointGroup
 
-from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
+from torch_canon.pointcloud import CanonEn as Canon
 
 
 # Setup
@@ -38,7 +38,7 @@ args = parser.parse_args()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 qm9 = QM9(root='./data/qm9-2.4.0/')
-frame = Frame(tol=args.tol)
+frame = Canon(tol=args.tol)
 
 atomic_number_to_symbol = {
     1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'

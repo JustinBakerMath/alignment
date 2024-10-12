@@ -27,7 +27,7 @@ from torch_geometric.loader import DataLoader
 
 from pointgroup import PointGroup
 
-from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
+from torch_canon.pointcloud import CanonEn as Canon
 
 
 # Setup
@@ -121,7 +121,7 @@ else:
         print(f"Worker {rank} received task with {len(task)} molecules.")
         for idx,data in enumerate(task):
             print('Worker', rank, 'processing data', idx)
-            frame = Frame(tol=args.tol,save=True)
+            frame = Canon(tol=args.tol,save=True)
             align_pos, frame_R, frame_t = frame.get_frame(data.pos, data.z)
             data.align_pos = torch.from_numpy(align_pos)
             data.frame_R = frame_R

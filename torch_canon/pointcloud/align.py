@@ -31,19 +31,6 @@ def align_pc_s3(data, us_data, pth):
             frame = rot @ frame
         return data, frame
 
-
-#def align_pc_s3(data, ref_frame):
-    #funcs = {
-            #0: z_axis_alignment, 
-            #1: yz_planar_alignment,
-            #2: sign_alignment}
-    #ref_frame = torch.eye(3)
-    #for idx,val in enumerate(pth):
-        #data, rot = funcs[idx](data, shell_data[val])
-        #shell_data = shell_data*rot
-        #ref_frame = ref_frame*rot
-    #return data, ref_frame
-
 # Coordinate Transforms
 # -----------------------
 

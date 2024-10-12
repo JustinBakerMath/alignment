@@ -14,8 +14,8 @@ import numpy as np
 import torch
 
 from torch_canon.utilities import custom_round, list_rotate
-from torch_canon.E3Global.align3D import cartesian2spherical_xtheta, project_onto_plane, angle_between_vectors 
-from torch_canon.E3Global.geometry3D import check_colinear, spherical_angles_between_vectors
+from .align import cartesian2spherical_xtheta, project_onto_plane, angle_between_vectors 
+from .complete import check_colinear, spherical_angles_between_vectors
 
 # Unit Sphere (US)
 #----------------------------

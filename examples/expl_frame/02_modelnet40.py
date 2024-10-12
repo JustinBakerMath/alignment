@@ -5,12 +5,12 @@ from tqdm import tqdm
 
 sys.path.append('./datasets/')
 from modelnet40 import ModelNet40Dataset
-from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
+from torch_canon.pointcloud import CanonEn as Canon
 
 train_ds = ModelNet40Dataset(root='./data/modelnet')
 test_ds = ModelNet40Dataset(root='./data/modelnet', name='test')
 
-frame = Frame(tol=1e-2)
+frame = Canon(tol=1e-2)
 
 print(train_ds)
 print(test_ds)
