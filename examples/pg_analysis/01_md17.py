@@ -79,7 +79,7 @@ np.random.seed(seed + rank)
 # ---------
 for idx,data in enumerate(md17[start_idx:end_idx]):
 
-    frame = Frame(tol=0.5, save='all')
+    frame = Frame(tol=0.2, save='all')
 
     if rank==0 and (idx+1) % args.frq_log == 0:  
         logging.info(f"Process {rank}: Completed {idx+1}/{chunk_size} iterations.")
@@ -89,6 +89,15 @@ for idx,data in enumerate(md17[start_idx:end_idx]):
 
     data_rank = torch.linalg.matrix_rank(pc_data)
     normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
+    
+    symbols = [atomic_number_to_symbol[z] for z in cat_data]
+    smiles = ''.join([atomic_number_to_symbol[z] for z in data.z.numpy()])
+    try:
+        pg = PointGroup(normalized_data, symbols).get_point_group()
+    except:
+        pg = 'NA'
+    logging.info(f'{idx}: ({smiles}, {pg})')
+    
     print(frame.symmetric_elements)
 
     loss += compute_loss(pc_data, normalized_data)

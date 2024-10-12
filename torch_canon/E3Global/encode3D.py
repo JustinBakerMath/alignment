@@ -38,7 +38,7 @@ def enc_us_pc(data, tol=1e-16, **kwargs):
 
     return dists_hash, encoding, proj_data[uq_indx]
 
-def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, **kwargs):
+def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, angle_tol=None, **kwargs):
     encoding = {} if dist_encoding is None else dist_encoding
     dists_hash = {} if dist_hash is None else dist_hash
 
@@ -52,7 +52,7 @@ def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, 
     else:
         test_points = proj_data
 
-    locally_close_idx_arrs, uq_indx = reduce_us(test_points, data, tol=tol)
+    locally_close_idx_arrs, uq_indx = reduce_us(test_points, data, tol=tol, angle_tol=angle_tol)
 
     # Encode information while pooling locally close points
     sorted_local_mask = []
@@ -75,9 +75,11 @@ def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, 
 
 # Convex Hull (CH)
 #----------------------------
-def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-16):
+def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-16, angle_tol=None):
     encoding = {} if g_encoding is None else g_encoding
     g_hash = {} if g_hash is None else g_hash
+
+    angle_tol = 0.03 if angle_tol is None else angle_tol
 
     # Encode edge information
     for point in edge_dict.keys():
@@ -92,7 +94,7 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
             #print('ref_vec is zero')
             ref_vec = us_data[~point].mean(dim=0)
         angles = [angle_between_vectors(projection[i], ref_vec).item() for i in range(len(edge_dict[point]))]
-        angles = [custom_round(a,0.03).item() for a in angles]
+        angles = [custom_round(a,angle_tol).item() for a in angles]
         d_ij = [angle_between_vectors(us_data[nbr], us_data[point]) for nbr in edge_dict[point]]
         d_ij = [custom_round(d.item(),tol) for d in d_ij]
         tuples = [(angles[i], d_ij[i], edge_dict[point][i]) for i in range(len(edge_dict[point]))]
@@ -107,7 +109,7 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
 
         d_ij = [angle_between_vectors(us_data[nbr], us_data[point]) for nbr in edge_dict[point]]
         # lexicographical shift
-        angles = [custom_round(a.item(),0.03) for a in angle]
+        angles = [custom_round(a.item(),angle_tol) for a in angle]
         dists = [custom_round(d.item(),tol) for d in d_ij]
         #angles, idx = tuple(list_rotate(angles))
         #dists = dists[idx:] + dists[:idx]
@@ -121,7 +123,8 @@ def enc_ch_pc(us_data, edge_dict, us_rank, g_hash=None, g_encoding=None, tol=1e-
 
 # Reduction Tools
 #----------------
-def reduce_us(us_data, data, tol=1e-16):
+def reduce_us(us_data, data, tol=1e-16, angle_tol=None):
+    angle_tol = 0.03 if angle_tol is None else angle_tol
     similar_indices = []
     uq_indices = []
     I = [i for i in range(us_data.shape[0])]
@@ -136,7 +139,7 @@ def reduce_us(us_data, data, tol=1e-16):
             is_close  = torch.arccos(dotij) < tol
             is_close2 = torch.norm(us_data[i]-us_data[j]) < tol
             if is_close2:
-                colinear = check_colinear(data[i], data[j], 0.03)
+                colinear = check_colinear(data[i], data[j], angle_tol)
                 if colinear or is_close:
                     similar_indices[-1].append(j)
                     I.remove(j)
