@@ -1,0 +1,33 @@
+# This is a Spack Environment file.
+#
+# It describes a set of packages to be installed, along with
+# configuration settings.
+spack:
+  # add package specs to the `specs` list
+  specs:
+  - py-torch-geometric
+  - openmpi
+  - py-numpy
+  - py-mpi4py
+  - py-pip
+  - py-trimesh
+  - py-requests
+  - py-pytest
+  - tmux
+  - py-setuptools
+  - rdkit
+  - py-torch-cluster
+  - py-torch-scatter
+  - py-torch
+  - protobuf
+  - py-tensorboard
+  - py-lightning
+  - py-torchmetrics
+  - py-charset-normalizer
+  - py-huggingface-hub
+  - py-yacs
+  - py-ipdb
+  - python
+  view: true
+  concretizer:
+    unify: true
