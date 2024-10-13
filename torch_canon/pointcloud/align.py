@@ -31,19 +31,6 @@ def align_pc_s3(data, us_data, pth):
             frame = rot @ frame
         return data, frame
 
-
-#def align_pc_s3(data, ref_frame):
-    #funcs = {
-            #0: z_axis_alignment, 
-            #1: yz_planar_alignment,
-            #2: sign_alignment}
-    #ref_frame = torch.eye(3)
-    #for idx,val in enumerate(pth):
-        #data, rot = funcs[idx](data, shell_data[val])
-        #shell_data = shell_data*rot
-        #ref_frame = ref_frame*rot
-    #return data, ref_frame
-
 # Coordinate Transforms
 # -----------------------
 
@@ -137,8 +124,8 @@ def angle_between_vectors(a, b, dim=-1):
     return 2 * torch.atan2(
             (a * b_norm - a_norm * b).norm(dim=dim),
             (a * b_norm + a_norm * b).norm(dim=dim))
-
 """
+
 def angle_between_vectors(v0, v1):
     v0_norm = v0 / (torch.linalg.norm(v0) + 1e-10)
     v1_norm = v1 / (torch.linalg.norm(v1) + 1e-10)

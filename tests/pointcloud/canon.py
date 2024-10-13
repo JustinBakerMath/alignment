@@ -1,5 +1,5 @@
 '''
-PyTest for torch_canon/E3Global/encode3D.py
+PyTest for torch_canon/pointcloud/canon.py
 ==========================================
 '''
 
@@ -7,10 +7,10 @@ import pytest
 import torch
 import math
 
-from torch_canon.E3Global.qhull import get_ch_graph
+from torch_canon.pointcloud.qhull import get_ch_graph
 from torch_canon.utilities import build_adjacency_list
 
-from torch_canon.E3Global.encode3D import (enc_us_pc, enc_us_catpc, enc_ch_pc)
+from torch_canon.pointcloud.canon import (enc_us_pc, enc_us_catpc, enc_ch_pc)
 
 
 # Predefined Objects
@@ -124,7 +124,7 @@ def unittest_enc_ch_pc(val, tol):
         angles = []
         for angle, dist in key:
             angles.append(angle)
-            assert dist == pytest.approx(math.sqrt(2))
+            assert dist == pytest.approx(math.pi/2)
         # 2. Check
         assert sorted(angles) == angles
     # 3. Check

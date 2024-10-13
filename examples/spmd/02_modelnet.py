@@ -25,7 +25,7 @@ import torch
 sys.path.append('./datasets/')
 from modelnet40 import ModelNet40Dataset
 
-from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
+from torch_canon.pointcloud import CanonEn as Canon
 
 
 # Setup
@@ -39,7 +39,7 @@ args = parser.parse_args()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 modelnet40 = ModelNet40Dataset(root='./data/modelnet/')
-frame = Frame(tol=1e-2)
+frame = Canon(tol=1e-2)
 
 atomic_number_to_symbol = {1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'}
 

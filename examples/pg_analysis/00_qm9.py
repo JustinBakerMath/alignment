@@ -1,7 +1,7 @@
 '''
 Parallel Alignment of QM9
 =========================
-This script is used to normalize the QM9 dataset using the CategoricalPointCloud class.
+This script is used to normalize the QM9 dataset using the CanonEn class.
 In addition, it performs a random rotation and translation of the point cloud and calculates the Wasserstein distance between the original and the transformed point cloud.
 It does so in parallel for all the molecules in the QM9 dataset.
 '''

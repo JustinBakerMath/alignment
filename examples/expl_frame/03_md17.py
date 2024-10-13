@@ -1,9 +1,9 @@
 '''
-Parallel Alignment of QM9
+Parallel Alignment of MD17
 =========================
-This script is used to normalize the QM9 dataset using the CategoricalPointCloud class.
+This script is used to normalize the MD17 dataset using the CategoricalPointCloud class.
 In addition, it performs a random rotation and translation of the point cloud and calculates the Wasserstein distance between the original and the transformed point cloud.
-It does so in parallel for all the molecules in the QM9 dataset.
+It does so in parallel for all the molecules in the MD17 dataset.
 '''
 
 # Start up
@@ -19,7 +19,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.stats import wasserstein_distance_nd
 
 import torch
-from torch_geometric.datasets import QM9
+from torch_geometric.datasets import MD17
 from torch_geometric.loader import DataLoader
 
 from pointgroup import PointGroup
@@ -30,6 +30,7 @@ from torch_canon.pointcloud import CanonEn as Canon
 # Setup
 # -----
 parser = argparse.ArgumentParser()
+parser.add_argument('--name', type=str, default='benzene', help='Dataset name')
 parser.add_argument('--n_data', type=int, default=100, help='Random seed')
 parser.add_argument('--frq_log', type=int, default=10, help='Random seed')
 args = parser.parse_args()
@@ -37,7 +38,7 @@ args = parser.parse_args()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 start_time = time()
 
-qm9 = QM9(root='./data/qm9-2.4.0/')
+md17 = MD17(root='./data/md17/', name=args.name)
 frame = Canon(tol=1e-2, save='all')
 
 atomic_number_to_symbol = {
@@ -58,7 +59,7 @@ np.random.seed(42)
 
 # Main Loop
 # ---------
-for idx,data in enumerate(qm9[:args.n_data]):
+for idx,data in enumerate(md17[:args.n_data]):
 
     logging.info(f"Completed {idx+1}/{args.n_data} iterations.")
 
@@ -66,31 +67,5 @@ for idx,data in enumerate(qm9[:args.n_data]):
     cat_data = data.z.numpy()
     normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
 
-    try:
-        smiles = data.smiles
-    except:
-        smiles = ''.join([atomic_number_to_symbol[cat] for cat in cat_data])
-    symbols = [atomic_number_to_symbol[cat] for cat in cat_data]
-    try:
-        pg = PointGroup(normalized_data, symbols).get_point_group()
-    except:
-        pg = 'C1'
-    print(f'{smiles}: {pg}')
-    print(f'Symmetric Elements: {frame.symmetric_elements}')
-    print(f'Simple ASU: {frame.simple_asu}')
-
-    loss += compute_loss(pc_data, normalized_data)
-
-    #inv_R = torch.tensor(R.from_matrix(frame_R).inv().as_matrix(), dtype=torch.float32)
-    inv_R = torch.linalg.inv(frame_R)
-    recon_data = (inv_R @ normalized_data.T).T + frame_t
-    r_loss = compute_loss(pc_data, recon_data)
-    if r_loss > 1e-4:
-        logging.info(f'Loss {smiles}: {r_loss:.4f}')
-        break
-    recon_loss += r_loss
-
-logging.info(f'Average move {loss/args.n_data:.4f}')
-logging.info(f'Reconstruction loss {recon_loss/args.n_data:.4f}')
 logging.info(f'Time: {time()-start_time:.4f}')
 logging.info('Done!')

@@ -1,5 +1,5 @@
 '''
-PyTest for torch_canon/E3Global/
+PyTest for torch_canon/pointcloud/
 ==========================================
 
 '''
@@ -14,7 +14,7 @@ from pointgroup import PointGroup
 
 from torch_geometric.datasets import QM9
 
-from torch_canon.E3Global.CategoricalPointCloud import CatFrame as Frame
+from torch_canon.pointcloud import CanonEn as Canon
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(message)s')
 
@@ -51,7 +51,7 @@ def unittest_qm9(indices, tol):
     if i>max(indices):
       break
 
-  frame = Frame(tol=tol)
+  frame = Canon(tol=tol)
   for i, (data, smiles, pg) in enumerate(test_data):
     pc_data = data.pos
     cat_data = data.z

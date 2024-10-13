@@ -1,9 +1,9 @@
 '''
-Parallel Alignment of QM9
+Parallel Alignment of MD17
 =========================
-This script is used to normalize the QM9 dataset using the CategoricalPointCloud class.
+This script is used to normalize the MD17 dataset using the CategoricalPointCloud class.
 In addition, it performs a random rotation and translation of the point cloud and calculates the Wasserstein distance between the original and the transformed point cloud.
-It does so in parallel for all the molecules in the QM9 dataset.
+It does so in parallel for all the molecules in the MD17 dataset.
 '''
 
 # Start up
@@ -20,7 +20,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.stats import wasserstein_distance_nd
 
 import torch
-from torch_geometric.datasets import QM9
+from torch_geometric.datasets import MD17
 from torch_geometric.loader import DataLoader
 
 from pointgroup import PointGroup
@@ -31,6 +31,7 @@ from torch_canon.pointcloud import CanonEn as Canon
 # Setup
 # -----
 parser = argparse.ArgumentParser()
+parser.add_argument('--name', type=str, default='benzene', help='Dataset name')
 parser.add_argument('--n_data', type=int, default=100, help='Random seed')
 parser.add_argument('--frq_log', type=int, default=10, help='Random seed')
 args = parser.parse_args()
@@ -38,8 +39,7 @@ args = parser.parse_args()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 start_time = time()
 
-qm9 = QM9(root='./data/qm9-2.4.0/')
-frame = Canon(tol=1e-2)
+md17 = MD17(root='./data/md17/',name=args.name)
 
 atomic_number_to_symbol = {
     1: 'H', 6: 'C', 7: 'N', 8: 'O', 9: 'F'
@@ -60,7 +60,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-n_data = len(qm9[:args.n_data])
+n_data = len(md17[:args.n_data])
 n_g_actions = 5
 chunk_size = n_data // size
 start_idx = rank * chunk_size
@@ -76,7 +76,9 @@ np.random.seed(seed + rank)
 
 # Main Loop
 # ---------
-for idx,data in enumerate(qm9[start_idx:end_idx]):
+for idx,data in enumerate(md17[start_idx:end_idx]):
+
+    frame = Canon(tol=0.2, save='all')
 
     if rank==0 and (idx+1) % args.frq_log == 0:  
         logging.info(f"Process {rank}: Completed {idx+1}/{chunk_size} iterations.")
@@ -86,6 +88,16 @@ for idx,data in enumerate(qm9[start_idx:end_idx]):
 
     data_rank = torch.linalg.matrix_rank(pc_data)
     normalized_data, frame_R, frame_t = frame.get_frame(pc_data, cat_data)
+    
+    symbols = [atomic_number_to_symbol[z] for z in cat_data]
+    smiles = ''.join([atomic_number_to_symbol[z] for z in data.z.numpy()])
+    try:
+        pg = PointGroup(normalized_data, symbols).get_point_group()
+    except:
+        pg = 'NA'
+    logging.info(f'{idx}: ({smiles}, {pg})')
+    
+    print(frame.symmetric_elements)
 
     loss += compute_loss(pc_data, normalized_data)
 

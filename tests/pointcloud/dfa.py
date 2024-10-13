@@ -15,8 +15,8 @@ import torch
 import math
 
 from torch_canon.utilities import build_adjacency_list
-from torch_canon.E3Global.dfa3D import construct_dfa, convert_partition
-from torch_canon.E3Global.encode3D import enc_us_pc, enc_us_catpc, enc_ch_pc
+from torch_canon.pointcloud.dfa import construct_dfa, convert_partition
+from torch_canon.pointcloud.canon import enc_us_pc, enc_us_catpc, enc_ch_pc
 from torch_canon.Hopcroft import PartitionRefinement
 
 encodings = [[('dhash0', 'ghash0'), ('dhash0', 'ghash0'), ('dhash0', 'ghash0'), ('dhash0','ghash0')],

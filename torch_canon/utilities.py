@@ -15,8 +15,9 @@ from torch import Tensor, from_numpy
 # Arithmetic Tools
 #-----------------
 def custom_round(number, tolerance):
-    k = int(-log10(tolerance))
-    return round(number, k)
+    #k = int(-log10(tolerance))
+    #return round(number, k)
+    return tolerance * round(number/tolerance)
 
 # Graph Tools
 #------------
