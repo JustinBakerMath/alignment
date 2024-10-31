@@ -5,29 +5,31 @@
 spack:
   # add package specs to the `specs` list
   specs:
-  - py-torch-geometric
   - openmpi
-  - py-numpy
-  - py-mpi4py
-  - py-pip
-  - py-trimesh
-  - py-requests
-  - py-pytest
-  - tmux
-  - py-setuptools
-  - rdkit
-  - py-torch-cluster
-  - py-torch-scatter
-  - py-torch
   - protobuf
-  - py-tensorboard
-  - py-lightning
-  - py-torchmetrics
+  - py-ase
   - py-charset-normalizer
   - py-huggingface-hub
-  - py-yacs
   - py-ipdb
+  - py-lightning
+  - py-mpi4py
+  - py-numpy
+  - py-pip
+  - py-pytest
+  - py-requests
+  - py-setuptools
+  - py-spglib
+  - py-tensorboard
+  - py-torch
+  - py-torch-cluster
+  - py-torch-geometric
+  - py-torch-scatter
+  - py-torchmetrics
+  - py-trimesh
+  - py-yacs
   - python
+  - rdkit
+  - tmux
   view: true
   concretizer:
     unify: true
