@@ -62,7 +62,8 @@ def enc_us_catpc(data, cat_data, dist_hash=None, dist_encoding=None, tol=1e-16, 
         sorting_index = sorted(range(len(dists)), key=lambda k: dists[k])
         dists = tuple([ dists[k] for k in sorting_index]) # sort distances
         if len(sorting_index) > 1:
-            sorted_local_mask.append([idx_arr[k] for k in sorting_index])
+            # BUG: there is some issue in the indexing here
+            sorted_local_mask.append([idx_arr[k] for k in sorting_index][::-1])
         if dists not in dists_hash:
             dists_hash[dists] = len(dists_hash)#id(dists) # Hash data
         encoding[i] = dists_hash[dists]

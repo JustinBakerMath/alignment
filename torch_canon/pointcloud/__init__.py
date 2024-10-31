@@ -79,7 +79,7 @@ class CanonEn(metaclass=ABCMeta):
                 if len(elements)>0:
                     repeat_elements.add(tuple(elements))
                 continue
-            dists = np.linalg.norm(data[elements] - data[asu[-1]])
+            dists = np.linalg.norm(data[elements][:, np.newaxis, :] - data[asu][np.newaxis, :, :],axis=2).mean(axis=1)
             argmin = np.argmin(dists)
             asu.append(elements[argmin])
             elements = tuple(np.delete(elements, argmin, axis=0))

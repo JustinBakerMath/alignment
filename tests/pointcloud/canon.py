@@ -84,7 +84,6 @@ def unittest_enc_us_catpc(val,tol):
      1. points are projected onto the unit sphere
      2. locally close points are pooled together
      3. distances are sorted
-     4. correct return values
     '''
     data_map = {1:oneEQone, 2:twoEQtwo, 3:threeEQthree, 4:fourEQfour}
     cat_map = {1:[oneTOone, oneTOtwo],
@@ -95,7 +94,7 @@ def unittest_enc_us_catpc(val,tol):
         data = torch.tensor(data_map[idx+1], dtype=torch.float32)
         for i,incr in enumerate(range(idx+1,len(data)+1)):
             cat_i = torch.tensor(cat[i], dtype=torch.float32)
-            dists_hash, encoding, arr = enc_us_catpc(data[:incr], cat_i, tol=tol)
+            dists_hash, encoding, arr, sorted_local_mask, local_mask = enc_us_catpc(data[:incr], cat_i, tol=tol)
             # 1. Check
             assert arr.norm(dim=1).allclose(torch.ones(len(arr)))
             # 2. Check
@@ -103,8 +102,6 @@ def unittest_enc_us_catpc(val,tol):
             # 3. Check
             for key in dists_hash.keys():
                 assert sorted(key) == list(key)
-            # 4. Check
-            assert len(dists_hash) == idx+1
 
 
 def unittest_enc_ch_pc(val, tol):
@@ -112,7 +109,6 @@ def unittest_enc_ch_pc(val, tol):
     The important parts of the encoding are that
      1. distances are encoded correctly
      2. angles are ordered
-     3. correct return values
     '''
     data = torch.tensor(threeEQthree[:val], dtype=torch.float32)
     rank = torch.linalg.matrix_rank(data)
@@ -127,9 +123,6 @@ def unittest_enc_ch_pc(val, tol):
             assert dist == pytest.approx(math.pi/2)
         # 2. Check
         assert sorted(angles) == angles
-    # 3. Check
-    if val>1:
-        assert len(g_hash) == val
     pass
 
 

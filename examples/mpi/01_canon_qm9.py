@@ -220,22 +220,3 @@ if rank == 0:
         if count == 0:
             continue
         print(f'Point Group {list(pg_map.keys())[idx]} : ({count}, {val/count:.5f})')
-'''
-
-pg_loss_total = comm.reduce(np.array(pg_losses), op=MPI.SUM, root=0)
-pg_count_total = comm.reduce(np.array(pg_counts), op=MPI.SUM, root=0)
-rank1_loss_total = comm.reduce(data_rank1_loss, op=MPI.SUM, root=0)
-rank1_count_total = comm.reduce(data_rank1_count, op=MPI.SUM, root=0)
-rank2_loss_total = comm.reduce(data_rank2_loss, op=MPI.SUM, root=0)
-rank2_count_total = comm.reduce(data_rank2_count, op=MPI.SUM, root=0)
-rank3_loss_total = comm.reduce(data_rank3_loss, op=MPI.SUM, root=0)
-rank3_count_total = comm.reduce(data_rank3_count, op=MPI.SUM, root=0)
-
-#print(f'Rank 1 Loss: {data_rank1_loss/(data_rank1_count+1e-16):.5f},',
-      #f' Rank 2 Loss: {data_rank2_loss/(data_rank2_count+1e-16):.5f},',
-      #f' Rank 3 Loss: {data_rank3_loss/(data_rank3_count+1e-16):.5f}')
-#
-#for key, dct in pg_losses.items():
-    #val = dct['loss']/dct['count']
-    #print(f'\tPoint Group {key} : {val}')
-'''

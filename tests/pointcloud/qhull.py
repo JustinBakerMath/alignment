@@ -157,7 +157,7 @@ if __name__=='__main__':
     import sys
     from tqdm import tqdm
 
-    sys.path.append('./datasets/')
+    sys.path.append('./examples/datasets/')
     from modelnet40 import ModelNet40Dataset
 
     print('Loading ModelNet40 Dataset')
