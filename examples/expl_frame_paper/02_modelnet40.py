@@ -3,7 +3,7 @@
 import sys
 from tqdm import tqdm
 
-sys.path.append('./datasets/')
+sys.path.append('./examples/datasets/')
 from modelnet40 import ModelNet40Dataset
 from torch_canon.pointcloud import CanonEn as Canon
 
