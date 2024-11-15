@@ -9,9 +9,10 @@ It does so in parallel for all the molecules in the QM9 dataset.
 # Start up
 # -------
 import argparse
-import sys
+import os
 import logging
 
+import h5py
 from mpi4py import MPI
 from time import time
 
@@ -73,6 +74,8 @@ else:
 seed = comm.bcast(seed, root=0)
 np.random.seed(seed + rank)
 
+output_dir = f"./data/qm9_align_h5/processed_{rank}"
+os.makedirs(output_dir, exist_ok=True)
 
 # Main Loop
 # ---------
@@ -92,6 +95,15 @@ for idx,data in enumerate(qm9[start_idx:end_idx]):
     inv_R = torch.linalg.inv(frame_R)
     recon_data = (inv_R @ normalized_data.T).T + frame_t
     recon_loss = compute_loss(pc_data, recon_data)
+
+    # Save the dataset
+    save_path = os.path.join(output_dir, f'{idx}.pt')
+    with h5py.File(save_path, 'w') as f:
+        f.create_dataset('pos', data=normalized_data)
+        f.create_dataset('z', data=data.z)
+        f.create_dataset('frame_R', data=frame_R)
+        f.create_dataset('frame_t', data=frame_t)
+        f.create_dataset('y', data=data.y)
 
 loss_total = comm.reduce(loss, op=MPI.SUM, root=0)
 recon_loss_total = comm.reduce(recon_loss, op=MPI.SUM, root=0)
