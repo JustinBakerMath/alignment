@@ -123,6 +123,8 @@ class CanonEn(metaclass=ABCMeta):
 
     def get_frame(self, data, cat_data, *args, **kwargs):
         data = check_type(data) # Assert Type
+        if data.shape[0]==1:
+            return data, torch.eye(self.n), data.clone()
 
         # TRANSLATION GROUP
         # -----------------
